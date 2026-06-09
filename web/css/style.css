@@ -300,6 +300,56 @@ body {
 .panel-result .ir-ok { color: #2d8a4e; }
 .panel-result .ir-fail { color: #c0392b; }
 
+/* ---- 二维码 ---- */
+.qr-wrapper {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 8px 0 4px;
+}
+.qr-img-container {
+    width: 180px; height: 180px; background: #fff;
+    border-radius: 12px; display: flex; align-items: center;
+    justify-content: center; overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    cursor: pointer; transition: transform 0.2s;
+}
+.qr-img-container:active { transform: scale(0.96); }
+.qr-img-container img { width: 160px; height: 160px; }
+.qr-placeholder {
+    font-size: 12px; color: #aaa;
+}
+.qr-hint {
+    font-size: 11px; color: var(--text-secondary); margin-top: 10px; text-align: center;
+}
+.qr-url {
+    font-size: 10px; color: var(--text-muted); margin-top: 4px;
+    word-break: break-all; text-align: center; max-width: 220px;
+}
+
+/* ---- 二维码放大弹窗 ---- */
+.qr-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300;
+    display: flex; align-items: center; justify-content: center;
+    animation: fadeIn 0.2s;
+}
+.qr-overlay.hidden { display: none; }
+.qr-overlay img {
+    width: 280px; height: 280px; background: #fff;
+    padding: 16px; border-radius: 16px;
+}
+
+/* ---- 分享按钮 ---- */
+.sum-actions {
+    position: absolute; top: -14px; right: 16px;
+}
+.share-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: #ffb74d; color: #1a1a2e; border: 2px solid #1a1a2e;
+    font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.15s; font-family: var(--font);
+}
+.share-btn:active { transform: scale(0.9); }
+
 /* ---- 弹窗/toast ---- */
 .toast {
     position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);

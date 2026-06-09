@@ -367,5 +367,118 @@ document.addEventListener('keydown', function(e) {
         if (!importOverlay.classList.contains('hidden')) {
             importOverlay.classList.add('hidden');
         }
+        // 关闭二维码放大弹窗
+        const qrOverlay = document.getElementById('qrOverlay');
+        if (qrOverlay && !qrOverlay.classList.contains('hidden')) {
+            qrOverlay.classList.add('hidden');
+        }
     }
 });
+
+// ==================== 二维码生成 ====================
+(function initQRCode() {
+    const container = document.getElementById('qrContainer');
+    const urlEl = document.getElementById('qrUrl');
+    if (!container || !urlEl) return;
+
+    // GitHub Pages 部署后的 URL
+    const pageUrl = 'https://pluto-hui.github.io/calc';
+    urlEl.textContent = pageUrl;
+
+    // 使用 api.qrserver.com 生成二维码
+    const qrImg = document.createElement('img');
+    qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(pageUrl)}`;
+    qrImg.alt = '扫码使用差价计算器';
+    qrImg.onload = function() {
+        container.innerHTML = '';
+        container.appendChild(qrImg);
+    };
+    qrImg.onerror = function() {
+        container.innerHTML = '<div class="qr-placeholder">二维码加载失败<br>请访问: ' + pageUrl + '</div>';
+    };
+
+    // 点击放大二维码
+    container.addEventListener('click', function() {
+        const existOverlay = document.getElementById('qrOverlay');
+        if (existOverlay) existOverlay.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'qrOverlay';
+        overlay.className = 'qr-overlay';
+        const bigImg = document.createElement('img');
+        bigImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(pageUrl)}`;
+        bigImg.alt = '扫码使用差价计算器';
+        overlay.appendChild(bigImg);
+        overlay.addEventListener('click', function(e) {
+            if (e.target === overlay) overlay.remove();
+        });
+        document.body.appendChild(overlay);
+    });
+})();
+
+// ==================== 分享功能 ====================
+document.getElementById('shareBtn').addEventListener('click', function() {
+    const { totalCost, totalMarket, totalProfit } = Calc.calcSummary();
+
+    // 生成分享摘要
+    const lines = [];
+    Calc.brands.forEach((b, i) => {
+        if (Calc.hiddenPresets.has(i)) return;
+        const w = parseFloat(Calc.getBrandWholesale(i)) || 0;
+        const m = parseFloat(Calc.getBrandMarket(i)) || 0;
+        const profit = Calc.calcProfit(i);
+        if (w > 0 && m > 0 && profit !== null) {
+            const sign = profit >= 0 ? '+' : '';
+            lines.push(`${b.name} ${sign}¥${profit.toFixed(2)}`);
+        }
+    });
+
+    const shareText = [
+        '💰 差价计算结果',
+        ...lines.slice(0, 10),  // 最多显示10行
+        lines.length > 10 ? `...共${lines.length}个品牌` : '',
+        `──────────────`,
+        `总成本 ¥${totalCost.toFixed(2)} | 市场价 ¥${totalMarket.toFixed(2)}`,
+        `💰 总利润 ¥${totalProfit.toFixed(2)}`,
+    ].filter(l => l).join('\n');
+
+    // 优先使用 Web Share API（移动端原生分享）
+    if (navigator.share) {
+        navigator.share({
+            title: '差价计算结果',
+            text: shareText,
+        }).catch(() => {
+            // 用户取消分享
+        });
+    } else {
+        // PC 端降级：复制到剪贴板
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(shareText).then(() => {
+                showToast('✅ 已复制到剪贴板');
+            }).catch(() => {
+                fallbackCopy(shareText);
+            });
+        } else {
+            fallbackCopy(shareText);
+        }
+    }
+});
+
+// 降级复制方案（旧浏览器）
+function fallbackCopy(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    textarea.style.top = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    try {
+        document.execCommand('copy');
+        showToast('✅ 已复制到剪贴板');
+    } catch (e) {
+        showToast('❌ 复制失败，请手动截图');
+    }
+    document.body.removeChild(textarea);
+}

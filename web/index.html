@@ -119,12 +119,23 @@
             </div>
         </div>
 
+        <div class="settings-section" id="qrcodeSection">
+            <h3>📱 扫码使用</h3>
+            <div class="qr-wrapper">
+                <div class="qr-img-container" id="qrContainer">
+                    <div class="qr-placeholder">加载中...</div>
+                </div>
+                <div class="qr-hint">扫描二维码在手机上打开计算器</div>
+                <div class="qr-url" id="qrUrl"></div>
+            </div>
+        </div>
+
         <div class="settings-section">
             <h3>ℹ️ 关于</h3>
             <div class="setting-row">
                 <div>
                     <div class="sr-label">版本</div>
-                    <div class="sr-desc">v2.0.0 — 2026.06</div>
+                    <div class="sr-desc">v2.1.0 — 2026.06</div>
                 </div>
             </div>
         </div>
@@ -132,6 +143,9 @@
 
     <!-- ====== 汇总卡片（固定在计算器页底部） ====== -->
     <div class="summary-card" id="summaryCard">
+        <div class="sum-actions">
+            <button class="share-btn" id="shareBtn" title="分享">📤</button>
+        </div>
         <div class="sum-inner">
             <div class="sum-block">
                 <div class="s-label">总成本</div>
