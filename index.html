@@ -79,12 +79,11 @@
         <div class="header">
             <div>
                 <h1>⚙️ 设置</h1>
-                <div class="tip">主题、数据备份、关于</div>
+                <div class="tip">主题切换</div>
             </div>
         </div>
 
         <div class="settings-section">
-            <h3>🎨 外观</h3>
             <div class="setting-row">
                 <div>
                     <div class="sr-label">深色模式</div>
@@ -94,23 +93,12 @@
             </div>
         </div>
 
-        <div class="settings-section" id="qrcodeSection">
-            <h3>📱 扫码使用</h3>
-            <div class="qr-wrapper">
-                <div class="qr-img-container" id="qrContainer">
-                    <div class="qr-placeholder">加载中...</div>
-                </div>
-                <div class="qr-hint">扫描二维码在手机上打开计算器</div>
-                <div class="qr-url" id="qrUrl"></div>
-            </div>
-        </div>
-
         <div class="settings-section">
             <h3>ℹ️ 关于</h3>
             <div class="setting-row">
                 <div>
                     <div class="sr-label">版本</div>
-                    <div class="sr-desc">v2.3.0 — 2026.06</div>
+                    <div class="sr-desc">v2.4.0 — 2026.06</div>
                 </div>
             </div>
         </div>
@@ -172,6 +160,28 @@
             <button class="btn-cancel" id="cancelImport">取消</button>
             <button class="btn-confirm" id="confirmImport">识别并导入</button>
         </div>
+    </div>
+</div>
+
+<!-- ====== 保存选择弹窗 ====== -->
+<div class="overlay hidden" id="saveOverlay">
+    <div class="action-sheet">
+        <h4>💾 导出 / 分享</h4>
+        <button class="as-btn" id="saveAsImage">
+            <span class="as-icon">📸</span>
+            <div>
+                <div class="as-label">保存为图片</div>
+                <div class="as-desc">截取计算器页面，保存 PNG</div>
+            </div>
+        </button>
+        <button class="as-btn" id="shareLink">
+            <span class="as-icon">📤</span>
+            <div>
+                <div class="as-label">分享链接</div>
+                <div class="as-desc">复制网页链接，发送给朋友</div>
+            </div>
+        </button>
+        <button class="as-cancel" id="cancelSave">取消</button>
     </div>
 </div>
 
