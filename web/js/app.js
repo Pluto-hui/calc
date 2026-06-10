@@ -218,10 +218,41 @@ document.getElementById('themeToggle').addEventListener('click', function() {
     Storage.setTheme(theme);
 });
 
-// ==================== 保存为图片 ====================
+// ==================== 保存按钮 → 弹出选择菜单 ====================
+const saveOverlay = document.getElementById('saveOverlay');
+
 document.getElementById('saveImageBtn').addEventListener('click', function() {
-    const btn = document.getElementById('saveImageBtn');
-    const iconEl = btn.querySelector('.tab-icon');
+    saveOverlay.classList.remove('hidden');
+});
+
+document.getElementById('cancelSave').addEventListener('click', function() {
+    saveOverlay.classList.add('hidden');
+});
+saveOverlay.addEventListener('click', function(e) {
+    if (e.target === saveOverlay) saveOverlay.classList.add('hidden');
+});
+
+// ---- 生成价格摘要文字 ----
+function getPriceSummary() {
+    const lines = [];
+    Calc.brands.forEach((b, i) => {
+        if (Calc.hiddenPresets.has(i)) return;
+        const profit = Calc.calcProfit(i);
+        if (profit !== null) {
+            const sign = profit >= 0 ? '+' : '';
+            lines.push(`${b.name} ${sign}¥${profit.toFixed(2)}`);
+        }
+    });
+    const { totalProfit } = Calc.calcSummary();
+    if (lines.length === 0) return '暂无数据';
+    return lines.slice(0, 5).join('，') + (lines.length > 5 ? `... 等共${lines.length}个品牌` : '') + `，总利润 ¥${totalProfit.toFixed(2)}`;
+}
+
+// ---- 保存为图片 ----
+document.getElementById('saveAsImage').addEventListener('click', function() {
+    saveOverlay.classList.add('hidden');
+
+    const iconEl = document.querySelector('#saveImageBtn .tab-icon');
     const origIcon = iconEl.textContent;
     iconEl.textContent = '⏳';
 
@@ -231,8 +262,7 @@ document.getElementById('saveImageBtn').addEventListener('click', function() {
         const calcTab = document.querySelector('.tab-item[data-page="calc"]');
         if (calcTab) calcTab.classList.add('active');
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        const calcPage = document.getElementById('page-calc');
-        if (calcPage) calcPage.classList.add('active');
+        document.getElementById('page-calc').classList.add('active');
 
         setTimeout(() => {
             html2canvas(document.getElementById('page-calc'), {
@@ -251,7 +281,7 @@ document.getElementById('saveImageBtn').addEventListener('click', function() {
                     a.click();
                     document.body.removeChild(a);
                     URL.revokeObjectURL(url);
-                    showToast('✅ 已保存为图片');
+                    showToast('✅ ' + getPriceSummary() + '  |  图片已保存');
                 }, 'image/png');
             }).catch(err => {
                 console.error('保存失败:', err);
@@ -275,6 +305,46 @@ document.getElementById('saveImageBtn').addEventListener('click', function() {
         doCapture();
     }
 });
+
+// ---- 分享链接 ----
+document.getElementById('shareLink').addEventListener('click', function() {
+    saveOverlay.classList.add('hidden');
+
+    const pageUrl = 'https://pluto-hui.github.io/calc';
+    const shareText = `💰 差价计算器\n${getPriceSummary()}\n\n📱 ${pageUrl}`;
+
+    if (navigator.share) {
+        navigator.share({
+            title: '差价计算器',
+            text: shareText,
+            url: pageUrl,
+        }).catch(() => {});
+    } else {
+        // PC 端复制链接
+        const copyText = shareText;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(copyText).then(() => {
+                showToast('✅ 链接已复制，可粘贴发送给朋友');
+            }).catch(() => {
+                fallbackCopy(copyText);
+            });
+        } else {
+            fallbackCopy(copyText);
+        }
+    }
+});
+
+// 降级复制
+function fallbackCopy(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed'; textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try { document.execCommand('copy'); showToast('✅ 链接已复制，可粘贴发送给朋友'); }
+    catch(e) { showToast('链接: ' + text); }
+    document.body.removeChild(textarea);
+}
 
 // ==================== 批量导入弹窗 ====================
 const importOverlay = document.getElementById('importOverlay');
@@ -394,44 +464,4 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
-// ==================== 二维码生成 ====================
-(function initQRCode() {
-    const container = document.getElementById('qrContainer');
-    const urlEl = document.getElementById('qrUrl');
-    if (!container || !urlEl) return;
-
-    // GitHub Pages 部署后的 URL
-    const pageUrl = 'https://pluto-hui.github.io/calc';
-    urlEl.textContent = pageUrl;
-
-    // 使用 api.qrserver.com 生成二维码
-    const qrImg = document.createElement('img');
-    qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(pageUrl)}`;
-    qrImg.alt = '扫码使用差价计算器';
-    qrImg.onload = function() {
-        container.innerHTML = '';
-        container.appendChild(qrImg);
-    };
-    qrImg.onerror = function() {
-        container.innerHTML = '<div class="qr-placeholder">二维码加载失败<br>请访问: ' + pageUrl + '</div>';
-    };
-
-    // 点击放大二维码
-    container.addEventListener('click', function() {
-        const existOverlay = document.getElementById('qrOverlay');
-        if (existOverlay) existOverlay.remove();
-
-        const overlay = document.createElement('div');
-        overlay.id = 'qrOverlay';
-        overlay.className = 'qr-overlay';
-        const bigImg = document.createElement('img');
-        bigImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(pageUrl)}`;
-        bigImg.alt = '扫码使用差价计算器';
-        overlay.appendChild(bigImg);
-        overlay.addEventListener('click', function(e) {
-            if (e.target === overlay) overlay.remove();
-        });
-        document.body.appendChild(overlay);
-    });
-})();
 

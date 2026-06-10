@@ -280,6 +280,36 @@ body {
 }
 .panel textarea:focus { border-color: var(--accent); }
 .panel-actions { display: flex; gap: 10px; margin-top: 14px; }
+
+/* ---- Action Sheet（底部弹出菜单） ---- */
+.action-sheet {
+    width: 100%; max-width: 500px; background: var(--bg-card);
+    border-radius: 20px 20px 0 0; padding: 20px 16px 28px;
+    animation: slideUp 0.25s; max-height: 90vh; overflow-y: auto;
+    align-self: flex-end;
+}
+.action-sheet h4 {
+    font-size: 15px; color: var(--text); margin-bottom: 16px; text-align: center;
+}
+.as-btn {
+    display: flex; align-items: center; gap: 14px;
+    width: 100%; padding: 14px 16px; border: none; background: var(--bg-input);
+    border-radius: 14px; margin-bottom: 10px; cursor: pointer;
+    font-family: var(--font); text-align: left; transition: background 0.15s;
+}
+.as-btn:active { background: var(--border); }
+.as-btn .as-icon { font-size: 28px; flex-shrink: 0; }
+.as-btn .as-label { font-size: 15px; font-weight: 600; color: var(--text); }
+.as-btn .as-desc { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+.as-cancel {
+    width: 100%; padding: 14px; border: none; background: var(--bg-input);
+    border-radius: 14px; font-size: 15px; font-weight: 600;
+    color: var(--text-secondary); cursor: pointer; font-family: var(--font);
+    margin-top: 4px;
+}
+.as-cancel:active { background: var(--border); }
+
+.panel textarea:focus { border-color: var(--accent); }
 .panel-actions button {
     flex: 1; padding: 11px; border-radius: 10px; font-size: 15px;
     font-weight: 600; cursor: pointer; font-family: var(--font); border: none;
