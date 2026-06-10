@@ -94,17 +94,6 @@
             </div>
         </div>
 
-        <div class="settings-section">
-            <h3>📸 截图导出</h3>
-            <div class="setting-row">
-                <div>
-                    <div class="sr-label">导出为图片</div>
-                    <div class="sr-desc">将计算器页面截取保存为 PNG 图片</div>
-                </div>
-                <button class="tool-btn screenshot-btn" id="exportScreenshot">📸 截图</button>
-            </div>
-        </div>
-
         <div class="settings-section" id="qrcodeSection">
             <h3>📱 扫码使用</h3>
             <div class="qr-wrapper">
@@ -121,7 +110,7 @@
             <div class="setting-row">
                 <div>
                     <div class="sr-label">版本</div>
-                    <div class="sr-desc">v2.2.0 — 2026.06</div>
+                    <div class="sr-desc">v2.3.0 — 2026.06</div>
                 </div>
             </div>
         </div>
@@ -129,9 +118,6 @@
 
     <!-- ====== 汇总卡片（固定在计算器页底部） ====== -->
     <div class="summary-card" id="summaryCard">
-        <div class="sum-actions">
-            <button class="share-btn" id="shareBtn" title="分享">📤</button>
-        </div>
         <div class="sum-inner">
             <div class="sum-block">
                 <div class="s-label">总成本</div>
@@ -162,6 +148,9 @@
     </button>
     <button class="tab-item" data-page="settings">
         <span class="tab-icon">⚙️</span>设置
+    </button>
+    <button class="tab-item save-btn-nav" id="saveImageBtn">
+        <span class="tab-icon">💾</span>保存
     </button>
 </nav>
 

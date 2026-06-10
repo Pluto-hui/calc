@@ -291,13 +291,6 @@ body {
 .btn-warn { background: var(--danger-bg); color: var(--danger); }
 .btn-warn:active { opacity: 0.85; }
 
-/* 截图按钮 */
-.screenshot-btn {
-    background: var(--accent); color: #fff; border: none;
-    font-weight: 600; padding: 9px 18px;
-}
-.screenshot-btn:active { opacity: 0.85; }
-
 /* ---- 容器底部间距（给汇总卡片+导航栏留空间） ---- */
 .container { padding-bottom: 130px; }
 
@@ -348,18 +341,11 @@ body {
     padding: 16px; border-radius: 16px;
 }
 
-/* ---- 分享按钮 ---- */
-.sum-actions {
-    position: absolute; top: -14px; right: 16px;
+/* ---- 保存按钮（导航栏内） ---- */
+.save-btn-nav {
+    color: var(--positive) !important;
 }
-.share-btn {
-    width: 36px; height: 36px; border-radius: 50%;
-    background: #ffb74d; color: #1a1a2e; border: 2px solid #1a1a2e;
-    font-size: 16px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: transform 0.15s; font-family: var(--font);
-}
-.share-btn:active { transform: scale(0.9); }
+.save-btn-nav:active { opacity: 0.7; }
 
 /* ---- 弹窗/toast ---- */
 .toast {

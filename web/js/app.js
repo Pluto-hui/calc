@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
 document.querySelectorAll('.tab-item').forEach(tab => {
     tab.addEventListener('click', function() {
         const page = this.dataset.page;
+        if (!page) return; // 保存按钮没有 page，跳过页面切换
         // 切换 tab 高亮
         document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
         this.classList.add('active');
@@ -217,30 +218,15 @@ document.getElementById('themeToggle').addEventListener('click', function() {
     Storage.setTheme(theme);
 });
 
-// ==================== 截图导出 ====================
-document.getElementById('exportScreenshot').addEventListener('click', function() {
-    const btn = document.getElementById('exportScreenshot');
-    btn.textContent = '⏳';
-    btn.disabled = true;
+// ==================== 保存为图片 ====================
+document.getElementById('saveImageBtn').addEventListener('click', function() {
+    const btn = document.getElementById('saveImageBtn');
+    const iconEl = btn.querySelector('.tab-icon');
+    const origIcon = iconEl.textContent;
+    iconEl.textContent = '⏳';
 
-    // 检查 html2canvas 是否已加载
-    if (typeof html2canvas === 'undefined') {
-        // 动态加载
-        const script = document.createElement('script');
-        script.src = 'https://html2canvas.hertzen.com/dist/html2canvas.min.js';
-        script.onload = function() { captureScreenshot(); };
-        script.onerror = function() {
-            showToast('❌ 加载失败，请检查网络');
-            btn.textContent = '📸 截图';
-            btn.disabled = false;
-        };
-        document.head.appendChild(script);
-    } else {
-        captureScreenshot();
-    }
-
-    function captureScreenshot() {
-        // 切换到计算器页面
+    function doCapture() {
+        // 确保在计算器页面
         document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
         const calcTab = document.querySelector('.tab-item[data-page="calc"]');
         if (calcTab) calcTab.classList.add('active');
@@ -248,17 +234,14 @@ document.getElementById('exportScreenshot').addEventListener('click', function()
         const calcPage = document.getElementById('page-calc');
         if (calcPage) calcPage.classList.add('active');
 
-        // 短暂延迟等页面渲染
         setTimeout(() => {
-            const target = document.getElementById('page-calc');
-            html2canvas(target, {
+            html2canvas(document.getElementById('page-calc'), {
                 backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
                 scale: 2,
                 useCORS: true,
                 allowTaint: true,
                 windowWidth: 500,
             }).then(canvas => {
-                // 下载图片
                 canvas.toBlob(function(blob) {
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
@@ -268,16 +251,28 @@ document.getElementById('exportScreenshot').addEventListener('click', function()
                     a.click();
                     document.body.removeChild(a);
                     URL.revokeObjectURL(url);
-                    showToast('✅ 截图已下载');
+                    showToast('✅ 已保存为图片');
                 }, 'image/png');
             }).catch(err => {
-                console.error('截图失败:', err);
-                showToast('❌ 截图失败，请重试');
+                console.error('保存失败:', err);
+                showToast('❌ 保存失败，请重试');
             }).finally(() => {
-                btn.textContent = '📸 截图';
-                btn.disabled = false;
+                iconEl.textContent = origIcon;
             });
         }, 100);
+    }
+
+    if (typeof html2canvas === 'undefined') {
+        const script = document.createElement('script');
+        script.src = 'https://html2canvas.hertzen.com/dist/html2canvas.min.js';
+        script.onload = doCapture;
+        script.onerror = function() {
+            showToast('❌ 网络异常，请稍后重试');
+            iconEl.textContent = origIcon;
+        };
+        document.head.appendChild(script);
+    } else {
+        doCapture();
     }
 });
 
@@ -440,69 +435,3 @@ document.addEventListener('keydown', function(e) {
     });
 })();
 
-// ==================== 分享功能 ====================
-document.getElementById('shareBtn').addEventListener('click', function() {
-    const { totalCost, totalMarket, totalProfit } = Calc.calcSummary();
-
-    // 生成分享摘要
-    const lines = [];
-    Calc.brands.forEach((b, i) => {
-        if (Calc.hiddenPresets.has(i)) return;
-        const w = parseFloat(Calc.getBrandWholesale(i)) || 0;
-        const m = parseFloat(Calc.getBrandMarket(i)) || 0;
-        const profit = Calc.calcProfit(i);
-        if (w > 0 && m > 0 && profit !== null) {
-            const sign = profit >= 0 ? '+' : '';
-            lines.push(`${b.name} ${sign}¥${profit.toFixed(2)}`);
-        }
-    });
-
-    const shareText = [
-        '💰 差价计算结果',
-        ...lines.slice(0, 10),  // 最多显示10行
-        lines.length > 10 ? `...共${lines.length}个品牌` : '',
-        `──────────────`,
-        `总成本 ¥${totalCost.toFixed(2)} | 市场价 ¥${totalMarket.toFixed(2)}`,
-        `💰 总利润 ¥${totalProfit.toFixed(2)}`,
-    ].filter(l => l).join('\n');
-
-    // 优先使用 Web Share API（移动端原生分享）
-    if (navigator.share) {
-        navigator.share({
-            title: '差价计算结果',
-            text: shareText,
-        }).catch(() => {
-            // 用户取消分享
-        });
-    } else {
-        // PC 端降级：复制到剪贴板
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(shareText).then(() => {
-                showToast('✅ 已复制到剪贴板');
-            }).catch(() => {
-                fallbackCopy(shareText);
-            });
-        } else {
-            fallbackCopy(shareText);
-        }
-    }
-});
-
-// 降级复制方案（旧浏览器）
-function fallbackCopy(text) {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed';
-    textarea.style.left = '-9999px';
-    textarea.style.top = '-9999px';
-    document.body.appendChild(textarea);
-    textarea.focus();
-    textarea.select();
-    try {
-        document.execCommand('copy');
-        showToast('✅ 已复制到剪贴板');
-    } catch (e) {
-        showToast('❌ 复制失败，请手动截图');
-    }
-    document.body.removeChild(textarea);
-}
