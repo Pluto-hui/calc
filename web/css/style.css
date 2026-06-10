@@ -159,17 +159,18 @@ body {
 
 /* ---- 汇总卡片 ---- */
 .summary-card {
-    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
-    width: 100%; max-width: 500px; background: #1a1a2e;
-    padding: 14px 20px; color: #fff; border-radius: 16px 16px 0 0;
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.15); z-index: 10;
+    position: fixed; bottom: 56px; left: 50%; transform: translateX(-50%);
+    width: calc(100% - 24px); max-width: 476px; background: linear-gradient(135deg, #1a1a2e 0%, #1e2a4a 100%);
+    padding: 16px 24px; color: #fff; border-radius: 16px;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.25), 0 0 0 2px rgba(255,183,77,0.3);
+    z-index: 25;
 }
 .summary-card .sum-inner { display: flex; align-items: center; justify-content: space-between; }
 .summary-card .sum-block { text-align: center; }
-.summary-card .s-label { font-size: 10px; opacity: 0.45; letter-spacing: 0.5px; }
-.summary-card .s-value { font-size: 18px; font-weight: 700; margin-top: 2px; }
-.summary-card .s-value.big { font-size: 21px; color: #ffb74d; }
-.summary-card .sum-divider-v { width: 1px; height: 34px; background: rgba(255,255,255,0.1); }
+.summary-card .s-label { font-size: 11px; opacity: 0.6; letter-spacing: 0.5px; font-weight: 500; }
+.summary-card .s-value { font-size: 20px; font-weight: 700; margin-top: 4px; }
+.summary-card .s-value.big { font-size: 24px; color: #ffb74d; text-shadow: 0 0 12px rgba(255,183,77,0.4); }
+.summary-card .sum-divider-v { width: 1px; height: 38px; background: rgba(255,255,255,0.12); }
 
 /* ---- 底部导航 ---- */
 .tab-bar {
@@ -289,6 +290,16 @@ body {
 .btn-confirm:active { opacity: 0.85; }
 .btn-warn { background: var(--danger-bg); color: var(--danger); }
 .btn-warn:active { opacity: 0.85; }
+
+/* 截图按钮 */
+.screenshot-btn {
+    background: var(--accent); color: #fff; border: none;
+    font-weight: 600; padding: 9px 18px;
+}
+.screenshot-btn:active { opacity: 0.85; }
+
+/* ---- 容器底部间距（给汇总卡片+导航栏留空间） ---- */
+.container { padding-bottom: 130px; }
 
 .panel-result {
     margin-top: 10px; font-size: 12px; padding: 10px 14px;
