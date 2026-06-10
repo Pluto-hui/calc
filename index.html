@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="description" content="商品差价计算器 - 快速计算批发价与市场价之间的利润差价">
+<meta name="theme-color" content="#f5f6f8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="差价计算器">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/favicon.ico" type="image/x-icon">
+<title>差价计算器</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="container">
+
+    <!-- ====== 页面 1：计算器 ====== -->
+    <div class="page active" id="page-calc">
+        <div class="header">
+            <div>
+                <h1>💰 差价计算器</h1>
+                <div class="tip">点击数字直接修改 · 差价自动计算</div>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <button class="tool-btn" id="importBtn">📥 批量导入价格</button>
+            <button class="tool-btn restore" id="restoreBtn">🔄 恢复已删</button>
+        </div>
+
+        <div class="list-header">
+            <span class="h-name">品牌</span>
+            <span class="h-flex">批发价(条)</span>
+            <span class="h-flex">市场价(条)</span>
+            <span class="h-qty">数量</span>
+            <span class="h-diff">差价</span>
+            <span class="h-del"></span>
+        </div>
+
+        <div id="brandList"></div>
+
+        <div class="add-row" style="margin-top:6px;">
+            <input type="text" id="newBrandName" placeholder="品牌名" maxlength="20">
+            <input type="number" id="newWholesale" placeholder="批发价" step="0.1" min="0">
+            <input type="number" id="newMarket" placeholder="市场价" step="0.1" min="0">
+            <button class="add-btn" id="addCustomBtn">＋ 添加</button>
+        </div>
+    </div>
+
+    <!-- ====== 页面 2：品牌库 ====== -->
+    <div class="page" id="page-brands">
+        <div class="header">
+            <div>
+                <h1>📦 品牌库</h1>
+                <div class="tip">管理你的品牌列表和预设价格</div>
+            </div>
+        </div>
+
+        <div class="brand-editor">
+            <div class="be-hint">
+                每行一个品牌：<code>品牌名 批发价 市场价</code><br>
+                市场价可选，保存后自动填入计算器
+            </div>
+            <textarea id="brandEditorText" placeholder="品牌名 批发价 市场价
+中华(硬) 381.0 450.0
+利群(新版) 122.0 155.0"></textarea>
+            <div class="be-actions">
+                <button class="btn-reset" id="resetBrandsBtn">清空品牌库</button>
+                <button class="btn-save" id="saveBrandsBtn">💾 保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== 页面 3：设置 ====== -->
+    <div class="page" id="page-settings">
+        <div class="header">
+            <div>
+                <h1>⚙️ 设置</h1>
+                <div class="tip">主题、数据备份、关于</div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h3>🎨 外观</h3>
+            <div class="setting-row">
+                <div>
+                    <div class="sr-label">深色模式</div>
+                    <div class="sr-desc">切换深色/浅色主题</div>
+                </div>
+                <div class="toggle-switch" id="themeToggle"></div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h3>💾 数据管理</h3>
+            <div class="setting-row">
+                <div>
+                    <div class="sr-label">导出 CSV</div>
+                    <div class="sr-desc">导出计算结果为 Excel 可打开的 CSV</div>
+                </div>
+                <button class="tool-btn" id="exportCSV">导出</button>
+            </div>
+            <div class="setting-row">
+                <div>
+                    <div class="sr-label">导出备份</div>
+                    <div class="sr-desc">导出全部数据为 JSON 备份文件</div>
+                </div>
+                <button class="tool-btn" id="exportJSON">导出</button>
+            </div>
+            <div class="setting-row">
+                <div>
+                    <div class="sr-label">导入备份</div>
+                    <div class="sr-desc">从 JSON 备份文件恢复数据</div>
+                </div>
+                <button class="tool-btn" id="importJSON">导入</button>
+            </div>
+        </div>
+
+        <div class="settings-section" id="qrcodeSection">
+            <h3>📱 扫码使用</h3>
+            <div class="qr-wrapper">
+                <div class="qr-img-container" id="qrContainer">
+                    <div class="qr-placeholder">加载中...</div>
+                </div>
+                <div class="qr-hint">扫描二维码在手机上打开计算器</div>
+                <div class="qr-url" id="qrUrl"></div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h3>ℹ️ 关于</h3>
+            <div class="setting-row">
+                <div>
+                    <div class="sr-label">版本</div>
+                    <div class="sr-desc">v2.1.0 — 2026.06</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== 汇总卡片（固定在计算器页底部） ====== -->
+    <div class="summary-card" id="summaryCard">
+        <div class="sum-actions">
+            <button class="share-btn" id="shareBtn" title="分享">📤</button>
+        </div>
+        <div class="sum-inner">
+            <div class="sum-block">
+                <div class="s-label">总成本</div>
+                <div class="s-value" id="sumCost">¥0.00</div>
+            </div>
+            <div class="sum-divider-v"></div>
+            <div class="sum-block">
+                <div class="s-label">市场价合计</div>
+                <div class="s-value" id="sumMarket">¥0.00</div>
+            </div>
+            <div class="sum-divider-v"></div>
+            <div class="sum-block">
+                <div class="s-label">💰 利润差价</div>
+                <div class="s-value big" id="sumProfit">¥0.00</div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ====== 底部导航 ====== -->
+<nav class="tab-bar">
+    <button class="tab-item active" data-page="calc">
+        <span class="tab-icon">🧮</span>计算器
+    </button>
+    <button class="tab-item" data-page="brands">
+        <span class="tab-icon">📦</span>品牌库
+    </button>
+    <button class="tab-item" data-page="settings">
+        <span class="tab-icon">⚙️</span>设置
+    </button>
+</nav>
+
+<!-- ====== 批量导入弹窗 ====== -->
+<div class="overlay hidden" id="importOverlay">
+    <div class="panel">
+        <h3>📥 批量导入价格</h3>
+        <div class="hint">
+            从 Excel / 微信 / 网页复制价格表粘贴到下方<br>
+            支持格式：<code>品牌名 价格</code> &nbsp; <code>品牌名 批发价 市场价</code><br>
+            <span style="color:var(--text-secondary);">品牌名支持模糊匹配，括号全角半角、常见别称自动识别</span>
+        </div>
+        <textarea id="importText" placeholder="示例：
+中华（硬） 381.0 400.0
+利群(新版) 122.0 155.0
+软中华 583.5 700.0"></textarea>
+        <div class="panel-result" id="importResult"></div>
+        <div class="panel-actions">
+            <button class="btn-cancel" id="cancelImport">取消</button>
+            <button class="btn-confirm" id="confirmImport">识别并导入</button>
+        </div>
+    </div>
+</div>
+
+<!-- ====== Toast ====== -->
+<div class="toast" id="toast"></div>
+
+<!-- ====== JS ====== -->
+<script src="js/storage.js"></script>
+<script src="js/brands.js"></script>
+<script src="js/calculator.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
