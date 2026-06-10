@@ -217,44 +217,68 @@ document.getElementById('themeToggle').addEventListener('click', function() {
     Storage.setTheme(theme);
 });
 
-// 导出 CSV
-document.getElementById('exportCSV').addEventListener('click', function() {
-    const csv = Calc.exportCSV();
-    downloadFile('差价计算_导出.csv', '﻿' + csv, 'text/csv;charset=utf-8');
-    showToast('✅ CSV 已下载');
-});
+// ==================== 截图导出 ====================
+document.getElementById('exportScreenshot').addEventListener('click', function() {
+    const btn = document.getElementById('exportScreenshot');
+    btn.textContent = '⏳';
+    btn.disabled = true;
 
-// 导出备份
-document.getElementById('exportJSON').addEventListener('click', function() {
-    const json = Calc.exportJSON();
-    downloadFile('差价计算_备份.json', json, 'application/json');
-    showToast('✅ 备份文件已下载');
-});
-
-// 导入备份
-document.getElementById('importJSON').addEventListener('click', function() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(ev) {
-            const success = Calc.importJSON(ev.target.result);
-            if (success) {
-                renderBrandList();
-                recalcAllDiffs();
-                updateSummary();
-                document.getElementById('brandEditorText').value = brandsToText(Calc.brands);
-                showToast(`✅ 已恢复 ${Calc.brands.length} 个品牌`);
-            } else {
-                showToast('❌ 文件格式错误');
-            }
+    // 检查 html2canvas 是否已加载
+    if (typeof html2canvas === 'undefined') {
+        // 动态加载
+        const script = document.createElement('script');
+        script.src = 'https://html2canvas.hertzen.com/dist/html2canvas.min.js';
+        script.onload = function() { captureScreenshot(); };
+        script.onerror = function() {
+            showToast('❌ 加载失败，请检查网络');
+            btn.textContent = '📸 截图';
+            btn.disabled = false;
         };
-        reader.readAsText(file);
-    };
-    input.click();
+        document.head.appendChild(script);
+    } else {
+        captureScreenshot();
+    }
+
+    function captureScreenshot() {
+        // 切换到计算器页面
+        document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+        const calcTab = document.querySelector('.tab-item[data-page="calc"]');
+        if (calcTab) calcTab.classList.add('active');
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        const calcPage = document.getElementById('page-calc');
+        if (calcPage) calcPage.classList.add('active');
+
+        // 短暂延迟等页面渲染
+        setTimeout(() => {
+            const target = document.getElementById('page-calc');
+            html2canvas(target, {
+                backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
+                scale: 2,
+                useCORS: true,
+                allowTaint: true,
+                windowWidth: 500,
+            }).then(canvas => {
+                // 下载图片
+                canvas.toBlob(function(blob) {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = '差价计算_' + new Date().toISOString().slice(0, 10) + '.png';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    showToast('✅ 截图已下载');
+                }, 'image/png');
+            }).catch(err => {
+                console.error('截图失败:', err);
+                showToast('❌ 截图失败，请重试');
+            }).finally(() => {
+                btn.textContent = '📸 截图';
+                btn.disabled = false;
+            });
+        }, 100);
+    }
 });
 
 // ==================== 批量导入弹窗 ====================
