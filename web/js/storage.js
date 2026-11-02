@@ -70,8 +70,6 @@ const DEFAULT_BRANDS = [
 const HAS_LOADED_DEFAULTS = 'cigarette_calc_defaults_loaded';
 
 const Storage = {
-
-    // ---- 品牌库 ----
     loadBrands() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
@@ -83,7 +81,6 @@ const Storage = {
             }
         } catch (e) { /* ignore */ }
 
-        // 首次使用：自动加载默认品牌库
         if (!localStorage.getItem(HAS_LOADED_DEFAULTS)) {
             localStorage.setItem(HAS_LOADED_DEFAULTS, '1');
             Storage.saveBrands(DEFAULT_BRANDS);
@@ -95,7 +92,17 @@ const Storage = {
 
     saveBrands(brands) {
         try {
-            const data = { brands, updatedAt: new Date().toISOString() };
+            let data = {};
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+                try {
+                    data = JSON.parse(raw) || {};
+                } catch (e) {
+                    data = {};
+                }
+            }
+            data.brands = brands;
+            data.updatedAt = new Date().toISOString();
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
             return true;
         } catch (e) {
@@ -104,7 +111,6 @@ const Storage = {
         }
     },
 
-    // ---- 标签（多标签：标签名列表 + 品牌→标签映射） ----
     loadTags() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
@@ -159,7 +165,6 @@ const Storage = {
         }
     },
 
-    // ---- 使用记录 ----
     loadRecords() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
@@ -177,7 +182,7 @@ const Storage = {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
             const data = raw ? JSON.parse(raw) : {};
-            data.records = records.slice(0, 100); // 最多保留100条
+            data.records = records.slice(0, 100);
             data.updatedAt = new Date().toISOString();
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
             return true;
@@ -187,7 +192,6 @@ const Storage = {
         }
     },
 
-    // ---- 导出全部数据 ----
     exportAll() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
@@ -213,7 +217,6 @@ const Storage = {
         return false;
     },
 
-    // ---- 主题 ----
     getTheme() {
         return localStorage.getItem(THEME_KEY) || 'light';
     },

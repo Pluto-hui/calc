@@ -5,35 +5,45 @@
 // 当前筛选的标签（空 = 显示全部）
 let currentFilterTag = '';
 
+// ---- HTML 转义（标签名由用户自定义，避免特殊字符破坏结构） ----
+function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[ch]));
+}
+
 // ---- 初始化 ----
 document.addEventListener('DOMContentLoaded', () => {
-    // 主题
     const theme = Storage.getTheme();
     document.documentElement.setAttribute('data-theme', theme);
     if (theme === 'dark') document.getElementById('themeToggle').classList.add('on');
 
-    // 数据
     Calc.init();
     renderTagFilter();
     renderBrandList();
     updateSummary();
 
-    // 品牌库编辑框
     document.getElementById('brandEditorText').value = brandsToText(Calc.brands);
 });
+
+// ---- Service Worker（PWA 离线缓存） ----
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => {
+            console.warn('Service Worker 注册失败:', err);
+        });
+    });
+}
 
 // ==================== 底部导航 ====================
 document.querySelectorAll('.tab-item').forEach(tab => {
     tab.addEventListener('click', function() {
         const page = this.dataset.page;
-        if (!page) return; // 保存按钮没有 page，跳过页面切换
-        // 切换 tab 高亮
+        if (!page) return;
         document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
         this.classList.add('active');
-        // 切换页面
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.getElementById('page-' + page).classList.add('active');
-        // 进入品牌库页时刷新内容
         if (page === 'brands') {
             document.getElementById('brandEditorText').value = brandsToText(Calc.brands);
             renderTagManager();
@@ -45,11 +55,11 @@ document.querySelectorAll('.tab-item').forEach(tab => {
 // ==================== 品牌列表渲染 ====================
 function renderBrandList() {
     const container = document.getElementById('brandList');
+    renderTagFilter();
     let visible = Calc.brands
         .map((b, i) => ({ ...b, idx: i }))
         .filter(b => !Calc.hiddenPresets.has(b.idx));
 
-    // 按当前筛选标签过滤
     if (currentFilterTag) {
         visible = visible.filter(b => Calc.hasBrandTag(b.idx, currentFilterTag));
     }
@@ -59,7 +69,7 @@ function renderBrandList() {
             <div style="text-align:center;padding:40px 20px;color:var(--text-muted);">
                 <div style="font-size:40px;margin-bottom:10px;">📭</div>
                 <div style="font-size:14px;">${currentFilterTag ? '该标签下暂无品牌' : '品牌库为空'}</div>
-                <div style="font-size:12px;margin-top:4px;">${currentFilterTag ? '点击顶部「全部」查看所有品牌' : '切换到「品牌库」标签录入你的品牌'}</div>
+                <div style="font-size:12px;margin-top:4px;">${currentFilterTag ? '点击上方「🏷️ 标签」选择「全部」查看所有品牌' : '切换到「品牌库」标签录入你的品牌'}</div>
             </div>`;
         return;
     }
@@ -68,9 +78,14 @@ function renderBrandList() {
         const ws = Calc.getBrandWholesale(b.idx);
         const mkt = Calc.getBrandMarket(b.idx);
         const qty = Calc.getBrandQty(b.idx);
+        const tags = Calc.getBrandTags(b.idx);
+        const tagsHtml = tags.length
+            ? tags.map(t => `<button type="button" class="tag-pill${currentFilterTag === t ? ' active' : ''}" data-tag="${escapeHtml(t)}" title="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join('')
+            : '<span class="tag-empty">—</span>';
         return `
         <div class="brand-row preset" data-index="${b.idx}">
             <span class="brand-name">${b.name}</span>
+            <span class="brand-tags">${tagsHtml}</span>
             <input type="number" class="w-price" value="${ws}" step="0.1" min="0"
                    data-index="${b.idx}" data-field="wholesale" placeholder="批发价">
             <input type="number" class="m-price" value="${mkt}" step="0.1" min="0"
@@ -83,23 +98,95 @@ function renderBrandList() {
     }).join('');
 
     updateRestoreBtn();
+    recalcAllDiffs();
 }
 
-// ==================== 标签筛选栏渲染 ====================
+// ==================== 标签筛选下拉 ====================
+const tagFilterBtn = document.getElementById('tagFilterBtn');
+const tagMenu = document.getElementById('tagMenu');
+
+function closeTagMenu() {
+    tagMenu.classList.add('hidden');
+    tagFilterBtn.setAttribute('aria-expanded', 'false');
+}
+
+function openTagMenu() {
+    tagMenu.classList.remove('hidden');
+    tagFilterBtn.setAttribute('aria-expanded', 'true');
+
+    const margin = 8;
+    const btnRect = tagFilterBtn.getBoundingClientRect();
+    const menuWidth = Math.min(220, window.innerWidth - margin * 2);
+    let left = Math.min(btnRect.left, window.innerWidth - margin - menuWidth);
+    left = Math.max(margin, left);
+
+    tagMenu.style.width = menuWidth + 'px';
+    tagMenu.style.left = left + 'px';
+    tagMenu.style.top = (btnRect.bottom + 6) + 'px';
+    tagMenu.style.maxHeight = Math.max(140, Math.min(300, window.innerHeight - btnRect.bottom - 18)) + 'px';
+}
+
 function renderTagFilter() {
-    const container = document.getElementById('tagFilter');
-    if (!container) return;
-    let html = `<button class="tag-chip ${currentFilterTag === '' ? 'active' : ''}" data-tag="">全部</button>`;
-    Calc.tags.forEach(t => {
-        html += `<button class="tag-chip ${currentFilterTag === t ? 'active' : ''}" data-tag="${t}">${t}</button>`;
+    const label = document.getElementById('tagFilterLabel');
+    if (!label) return;
+    label.textContent = currentFilterTag || '全部';
+
+    const counts = {};
+    Object.keys(Calc.brandTags).forEach(k => {
+        (Calc.brandTags[k] || []).forEach(t => { counts[t] = (counts[t] || 0) + 1; });
     });
-    container.innerHTML = html;
+
+    let html = `<button class="tag-menu-item${currentFilterTag === '' ? ' active' : ''}" data-tag="">全部<span class="tmi-count">${Calc.brands.length} 个</span></button>`;
+    Calc.tags.forEach(t => {
+        html += `<button class="tag-menu-item${currentFilterTag === t ? ' active' : ''}" data-tag="${escapeHtml(t)}">${escapeHtml(t)}<span class="tmi-count">${counts[t] || 0} 个</span></button>`;
+    });
+    if (Calc.tags.length === 0) {
+        html += `<div class="tag-menu-empty">暂无标签，请到品牌库创建</div>`;
+    }
+    tagMenu.innerHTML = html;
 }
 
-document.getElementById('tagFilter').addEventListener('click', function(e) {
-    const chip = e.target.closest('.tag-chip');
-    if (!chip) return;
-    currentFilterTag = chip.dataset.tag;
+tagFilterBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (tagMenu.classList.contains('hidden')) {
+        openTagMenu();
+    } else {
+        closeTagMenu();
+    }
+});
+
+tagMenu.addEventListener('click', function(e) {
+    const item = e.target.closest('.tag-menu-item');
+    if (!item) return;
+    currentFilterTag = item.dataset.tag;
+    closeTagMenu();
+    renderTagFilter();
+    renderBrandList();
+    recalcAllDiffs();
+});
+
+document.addEventListener('click', function(e) {
+    if (tagMenu.classList.contains('hidden')) return;
+    if (e.target.closest('.tag-filter-wrap')) return;
+    closeTagMenu();
+});
+
+window.addEventListener('scroll', function() {
+    if (!tagMenu.classList.contains('hidden')) closeTagMenu();
+}, { passive: true });
+
+window.addEventListener('resize', function() {
+    if (!tagMenu.classList.contains('hidden')) closeTagMenu();
+});
+
+// ==================== 行内标签 → 点击筛选 ====================
+document.getElementById('brandList').addEventListener('click', function(e) {
+    const pill = e.target.closest('.tag-pill');
+    if (!pill) return;
+    e.preventDefault();
+    const tag = pill.dataset.tag;
+    // 再次点击当前标签则取消筛选，回到「全部」
+    currentFilterTag = currentFilterTag === tag ? '' : tag;
     renderTagFilter();
     renderBrandList();
     recalcAllDiffs();
@@ -150,7 +237,6 @@ function updateSummary() {
 
 // ==================== 删除/恢复 ====================
 document.getElementById('brandList').addEventListener('click', function(e) {
-    // 删除
     if (e.target.classList.contains('del-btn')) {
         const row = e.target.closest('.brand-row');
         const idx = e.target.dataset.index;
@@ -196,13 +282,11 @@ document.getElementById('addCustomBtn').addEventListener('click', function() {
     if (!wholesale || wholesale <= 0) { showToast('请输入批发价'); return; }
     if (!market || market <= 0) { showToast('请输入市场价'); return; }
 
-    // 追加到品牌库
     const newBrand = { name, wholesale };
     if (market) newBrand.market = market;
     const newBrands = [...Calc.brands, newBrand];
     Calc.saveBrands(newBrands);
 
-    // 重渲染
     renderBrandList();
     recalcAllDiffs();
     updateSummary();
@@ -253,9 +337,9 @@ function renderTagManager() {
         const count = Object.keys(Calc.brandTags).filter(k => Calc.brandTags[k].includes(t)).length;
         return `
         <div class="tm-item">
-            <span class="tm-name">🏷️ ${t}</span>
+            <span class="tm-name">🏷️ ${escapeHtml(t)}</span>
             <span class="tm-count">${count} 个品牌</span>
-            <button class="tm-del" data-tag="${t}" title="删除标签">删除</button>
+            <button class="tm-del" data-tag="${escapeHtml(t)}" title="删除标签">删除</button>
         </div>`;
     }).join('');
 }
@@ -266,10 +350,11 @@ document.getElementById('addTagBtn').addEventListener('click', function() {
     if (!name) { showToast('请输入标签名'); return; }
     if (Calc.addTag(name)) {
         input.value = '';
+        currentAssignTag = name;
         renderTagManager();
         renderTagFilter();
         renderTagSelect();
-        showToast(`✅ 标签「${name}」已创建`);
+        showToast(`✅ 标签「${name}」已创建，可在下方勾选品牌`);
     } else {
         showToast('⚠️ 标签已存在或无效');
     }
@@ -292,7 +377,7 @@ document.getElementById('tagList').addEventListener('click', function(e) {
 });
 
 // ==================== 标签分配（品牌库·标签管理内） ====================
-let currentAssignTag = '';  // 当前正在编辑的标签
+let currentAssignTag = '';
 
 function renderTagSelect() {
     const container = document.getElementById('tagSelect');
@@ -302,12 +387,11 @@ function renderTagSelect() {
         document.getElementById('tagAssignList').innerHTML = '';
         return;
     }
-    // 默认选中第一个标签
     if (!currentAssignTag || !Calc.tags.includes(currentAssignTag)) {
         currentAssignTag = Calc.tags[0];
     }
     container.innerHTML = Calc.tags.map(t => `
-        <button class="tag-chip ${currentAssignTag === t ? 'active' : ''}" data-tag="${t}">${t}</button>
+        <button class="tag-chip ${currentAssignTag === t ? 'active' : ''}" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>
     `).join('');
     renderTagAssignList();
 }
@@ -319,13 +403,12 @@ function renderTagAssignList() {
         container.innerHTML = '';
         return;
     }
-    // 列出所有品牌，勾选属于当前标签的
     container.innerHTML = Calc.brands.map((b, i) => {
         const checked = Calc.hasBrandTag(i, currentAssignTag);
         return `
         <button class="tag-assign-item ${checked ? 'checked' : ''}" data-index="${i}">
             <span class="ta-check">${checked ? '☑' : '☐'}</span>
-            <span class="ta-name">${b.name}</span>
+            <span class="ta-name">${escapeHtml(b.name)}</span>
         </button>`;
     }).join('');
 }
@@ -349,7 +432,6 @@ document.getElementById('tagAssignList').addEventListener('click', function(e) {
 });
 
 // ==================== 设置页 ====================
-// 主题切换
 document.getElementById('themeToggle').addEventListener('click', function() {
     const isDark = this.classList.toggle('on');
     const theme = isDark ? 'dark' : 'light';
@@ -371,7 +453,6 @@ saveOverlay.addEventListener('click', function(e) {
     if (e.target === saveOverlay) saveOverlay.classList.add('hidden');
 });
 
-// ---- 生成价格摘要文字 ----
 function getPriceSummary() {
     const lines = [];
     Calc.brands.forEach((b, i) => {
@@ -387,7 +468,6 @@ function getPriceSummary() {
     return lines.slice(0, 5).join('，') + (lines.length > 5 ? `... 等共${lines.length}个品牌` : '') + `，总利润 ¥${totalProfit.toFixed(2)}`;
 }
 
-// ---- 保存为图片 ----
 document.getElementById('saveAsImage').addEventListener('click', function() {
     saveOverlay.classList.add('hidden');
 
@@ -396,7 +476,6 @@ document.getElementById('saveAsImage').addEventListener('click', function() {
     iconEl.textContent = '⏳';
 
     function doCapture() {
-        // 确保在计算器页面
         document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
         const calcTab = document.querySelector('.tab-item[data-page="calc"]');
         if (calcTab) calcTab.classList.add('active');
@@ -445,7 +524,6 @@ document.getElementById('saveAsImage').addEventListener('click', function() {
     }
 });
 
-// ---- 分享链接 ----
 document.getElementById('shareLink').addEventListener('click', function() {
     saveOverlay.classList.add('hidden');
 
@@ -459,7 +537,6 @@ document.getElementById('shareLink').addEventListener('click', function() {
             url: pageUrl,
         }).catch(() => {});
     } else {
-        // PC 端复制链接
         const copyText = shareText;
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(copyText).then(() => {
@@ -473,7 +550,6 @@ document.getElementById('shareLink').addEventListener('click', function() {
     }
 });
 
-// 降级复制
 function fallbackCopy(text) {
     const textarea = document.createElement('textarea');
     textarea.value = text;
@@ -598,7 +674,8 @@ document.addEventListener('keydown', function(e) {
         if (saveOverlay && !saveOverlay.classList.contains('hidden')) {
             saveOverlay.classList.add('hidden');
         }
+        if (!tagMenu.classList.contains('hidden')) {
+            closeTagMenu();
+        }
     }
 });
-
-

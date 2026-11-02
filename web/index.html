@@ -28,15 +28,20 @@
 
         <div class="toolbar">
             <button class="tool-btn" id="importBtn">📥 批量导入价格</button>
+            <div class="tag-filter-wrap">
+                <button class="tool-btn tag-filter-btn" id="tagFilterBtn" aria-haspopup="true" aria-expanded="false" title="按标签筛选">
+                    🏷️ <span class="tag-filter-prefix">标签：</span><span id="tagFilterLabel">全部</span><span class="tag-caret">▾</span>
+                </button>
+                <div class="tag-menu hidden" id="tagMenu"></div>
+            </div>
             <button class="tool-btn restore" id="restoreBtn">🔄 恢复已删</button>
         </div>
 
-        <div class="tag-filter" id="tagFilter"></div>
-
         <div class="list-header">
             <span class="h-name">品牌</span>
-            <span class="h-flex">批发价(条)</span>
-            <span class="h-flex">市场价(条)</span>
+            <span class="h-tag">标签</span>
+            <span class="h-flex">批发价</span>
+            <span class="h-flex">市场价</span>
             <span class="h-qty">数量</span>
             <span class="h-diff">差价</span>
             <span class="h-del"></span>
@@ -113,7 +118,7 @@
             <div class="setting-row">
                 <div>
                     <div class="sr-label">版本</div>
-                    <div class="sr-desc">v3.0.0 — 2026.06</div>
+                    <div class="sr-desc">v3.1.0 — 2026.11</div>
                 </div>
             </div>
         </div>
