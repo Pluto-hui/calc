@@ -3,7 +3,6 @@
    ============================================ */
 
 const STORAGE_KEY = 'cigarette_calc_data_v3';
-const THEME_KEY = 'cigarette_calc_theme';
 
 // ---- 默认品牌库（首次使用时自动加载） ----
 const DEFAULT_BRANDS = [
@@ -215,13 +214,5 @@ const Storage = {
             console.error('导入失败:', e);
         }
         return false;
-    },
-
-    getTheme() {
-        return localStorage.getItem(THEME_KEY) || 'light';
-    },
-
-    setTheme(theme) {
-        localStorage.setItem(THEME_KEY, theme);
     },
 };

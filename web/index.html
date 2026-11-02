@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
@@ -82,45 +82,12 @@
 
         <div class="brand-editor tag-manager">
             <h3 class="tm-title">🏷️ 标签管理</h3>
-            <div class="tm-hint">新建/删除标签，并把品牌分配到标签</div>
+            <div class="tm-hint">新建标签后会自动展开，直接勾选品牌即可分配</div>
             <div class="tm-add">
                 <input type="text" id="newTagName" placeholder="输入标签名，如：高价位卷烟" maxlength="12">
                 <button class="btn-save" id="addTagBtn">＋ 新建</button>
             </div>
             <div class="tm-list" id="tagList"></div>
-            <div class="tm-assign-title">🔗 把品牌分配到标签</div>
-            <div class="tag-select" id="tagSelect"></div>
-            <div class="tag-assign-list" id="tagAssignList"></div>
-        </div>
-    </div>
-
-    <!-- ====== 页面 3：设置 ====== -->
-    <div class="page" id="page-settings">
-        <div class="header">
-            <div>
-                <h1>⚙️ 设置</h1>
-                <div class="tip">主题切换</div>
-            </div>
-        </div>
-
-        <div class="settings-section">
-            <div class="setting-row">
-                <div>
-                    <div class="sr-label">深色模式</div>
-                    <div class="sr-desc">切换深色/浅色主题</div>
-                </div>
-                <div class="toggle-switch" id="themeToggle"></div>
-            </div>
-        </div>
-
-        <div class="settings-section">
-            <h3>ℹ️ 关于</h3>
-            <div class="setting-row">
-                <div>
-                    <div class="sr-label">版本</div>
-                    <div class="sr-desc">v3.1.0 — 2026.11</div>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -154,12 +121,6 @@
     <button class="tab-item" data-page="brands">
         <span class="tab-icon">📦</span>品牌库
     </button>
-    <button class="tab-item" data-page="settings">
-        <span class="tab-icon">⚙️</span>设置
-    </button>
-    <button class="tab-item save-btn-nav" id="saveImageBtn">
-        <span class="tab-icon">💾</span>保存
-    </button>
 </nav>
 
 <!-- ====== 批量导入弹窗 ====== -->
@@ -180,28 +141,6 @@
             <button class="btn-cancel" id="cancelImport">取消</button>
             <button class="btn-confirm" id="confirmImport">识别并导入</button>
         </div>
-    </div>
-</div>
-
-<!-- ====== 保存选择弹窗 ====== -->
-<div class="overlay hidden" id="saveOverlay">
-    <div class="action-sheet">
-        <h4>💾 导出 / 分享</h4>
-        <button class="as-btn" id="saveAsImage">
-            <span class="as-icon">📸</span>
-            <div>
-                <div class="as-label">保存为图片</div>
-                <div class="as-desc">截取计算器页面，保存 PNG</div>
-            </div>
-        </button>
-        <button class="as-btn" id="shareLink">
-            <span class="as-icon">📤</span>
-            <div>
-                <div class="as-label">分享链接</div>
-                <div class="as-desc">复制网页链接，发送给朋友</div>
-            </div>
-        </button>
-        <button class="as-cancel" id="cancelSave">取消</button>
     </div>
 </div>
 

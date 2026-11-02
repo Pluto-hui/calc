@@ -14,10 +14,6 @@ function escapeHtml(str) {
 
 // ---- 初始化 ----
 document.addEventListener('DOMContentLoaded', () => {
-    const theme = Storage.getTheme();
-    document.documentElement.setAttribute('data-theme', theme);
-    if (theme === 'dark') document.getElementById('themeToggle').classList.add('on');
-
     Calc.init();
     renderTagFilter();
     renderBrandList();
@@ -47,7 +43,6 @@ document.querySelectorAll('.tab-item').forEach(tab => {
         if (page === 'brands') {
             document.getElementById('brandEditorText').value = brandsToText(Calc.brands);
             renderTagManager();
-            renderTagSelect();
         }
     });
 });
@@ -312,6 +307,7 @@ document.getElementById('saveBrandsBtn').addEventListener('click', function() {
     renderBrandList();
     recalcAllDiffs();
     updateSummary();
+    renderTagManager();
     showToast(`✅ 品牌库已保存（${brands.length} 个品牌）`);
 });
 
@@ -321,245 +317,152 @@ document.getElementById('resetBrandsBtn').addEventListener('click', function() {
         document.getElementById('brandEditorText').value = '';
         renderBrandList();
         updateSummary();
+        renderTagManager();
         showToast('品牌库已清空');
     }
 });
 
 // ==================== 标签管理（品牌库页） ====================
+let openTag = '';        // 当前展开的标签
+let tagSearch = '';      // 当前展开标签内的品牌搜索词
+
+function countTagBrands(tag) {
+    return Object.keys(Calc.brandTags).filter(k => Calc.brandTags[k].includes(tag)).length;
+}
+
+function applyTagSearch() {
+    const list = document.querySelector('.tm-item.open .tag-assign-list');
+    if (!list) return;
+    const q = tagSearch.trim().toLowerCase();
+    list.querySelectorAll('.tag-assign-item').forEach(item => {
+        const name = item.querySelector('.ta-name').textContent.toLowerCase();
+        item.classList.toggle('hidden', q !== '' && !name.includes(q));
+    });
+}
+
 function renderTagManager() {
     const container = document.getElementById('tagList');
     if (!container) return;
+
     if (Calc.tags.length === 0) {
-        container.innerHTML = `<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:13px;">暂无标签，输入名称新建</div>`;
+        openTag = '';
+        tagSearch = '';
+        container.innerHTML = `<div class="tm-empty">暂无标签<br>在上方输入名称新建，新建后可直接勾选品牌</div>`;
         return;
     }
+    if (openTag && !Calc.tags.includes(openTag)) {
+        openTag = '';
+        tagSearch = '';
+    }
+
     container.innerHTML = Calc.tags.map(t => {
-        const count = Object.keys(Calc.brandTags).filter(k => Calc.brandTags[k].includes(t)).length;
+        const open = t === openTag;
+        const count = countTagBrands(t);
+        const brandsHtml = open ? `
+            <div class="tm-body">
+                <div class="tm-body-tip">勾选要加入「${escapeHtml(t)}」的品牌</div>
+                <input type="text" class="tm-search" placeholder="搜索品牌" value="${escapeHtml(tagSearch)}">
+                <div class="tag-assign-list">
+                    ${Calc.brands.map((b, i) => {
+                        const checked = Calc.hasBrandTag(i, t);
+                        return `<button type="button" class="tag-assign-item${checked ? ' checked' : ''}" data-index="${i}">
+                            <span class="ta-check">${checked ? '☑' : '☐'}</span>
+                            <span class="ta-name">${escapeHtml(b.name)}</span>
+                        </button>`;
+                    }).join('')}
+                </div>
+            </div>` : '';
         return `
-        <div class="tm-item">
-            <span class="tm-name">🏷️ ${escapeHtml(t)}</span>
-            <span class="tm-count">${count} 个品牌</span>
-            <button class="tm-del" data-tag="${escapeHtml(t)}" title="删除标签">删除</button>
+        <div class="tm-item${open ? ' open' : ''}" data-tag="${escapeHtml(t)}">
+            <div class="tm-head">
+                <button type="button" class="tm-toggle" data-tag="${escapeHtml(t)}" aria-expanded="${open}">
+                    <span class="tm-name">🏷️ ${escapeHtml(t)}</span>
+                    <span class="tm-count">${count} 个品牌</span>
+                    <span class="tm-chevron">${open ? '▾' : '▸'}</span>
+                </button>
+                <button type="button" class="tm-del" data-tag="${escapeHtml(t)}" title="删除标签">删除</button>
+            </div>
+            ${brandsHtml}
         </div>`;
     }).join('');
+
+    if (tagSearch) applyTagSearch();
 }
 
 document.getElementById('addTagBtn').addEventListener('click', function() {
     const input = document.getElementById('newTagName');
     const name = input.value.trim();
-    if (!name) { showToast('请输入标签名'); return; }
-    if (Calc.addTag(name)) {
-        input.value = '';
-        currentAssignTag = name;
-        renderTagManager();
-        renderTagFilter();
-        renderTagSelect();
-        showToast(`✅ 标签「${name}」已创建，可在下方勾选品牌`);
-    } else {
-        showToast('⚠️ 标签已存在或无效');
+
+    if (!name) { showToast('请输入标签名'); input.focus(); return; }
+    if (name.length > 12) { showToast('标签名最多 12 个字'); return; }
+    if (Calc.tags.includes(name)) { showToast(`⚠️ 标签「${name}」已存在`); input.focus(); return; }
+    if (!Calc.addTag(name)) { showToast('标签创建失败，请重试'); return; }
+
+    input.value = '';
+    openTag = name;
+    tagSearch = '';
+    renderTagManager();
+    renderTagFilter();
+    showToast(`✅ 标签「${name}」已创建，请勾选品牌`);
+
+    const created = [...document.querySelectorAll('.tm-item')].find(el => el.dataset.tag === name);
+    if (created) created.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
+
+document.getElementById('newTagName').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('addTagBtn').click();
     }
+});
+
+document.getElementById('tagList').addEventListener('input', function(e) {
+    if (!e.target.classList.contains('tm-search')) return;
+    tagSearch = e.target.value;
+    applyTagSearch();
 });
 
 document.getElementById('tagList').addEventListener('click', function(e) {
-    if (e.target.classList.contains('tm-del')) {
-        const tag = e.target.dataset.tag;
+    const del = e.target.closest('.tm-del');
+    if (del) {
+        const tag = del.dataset.tag;
         if (confirm(`确定删除标签「${tag}」吗？该标签将从所有品牌移除。`)) {
             Calc.deleteTag(tag);
             if (currentFilterTag === tag) currentFilterTag = '';
-            if (currentAssignTag === tag) currentAssignTag = '';
+            if (openTag === tag) { openTag = ''; tagSearch = ''; }
             renderTagManager();
             renderTagFilter();
-            renderTagSelect();
             renderBrandList();
             showToast(`✅ 已删除标签「${tag}」`);
         }
-    }
-});
-
-// ==================== 标签分配（品牌库·标签管理内） ====================
-let currentAssignTag = '';
-
-function renderTagSelect() {
-    const container = document.getElementById('tagSelect');
-    if (!container) return;
-    if (Calc.tags.length === 0) {
-        container.innerHTML = `<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">请先在上方新建标签</div>`;
-        document.getElementById('tagAssignList').innerHTML = '';
         return;
     }
-    if (!currentAssignTag || !Calc.tags.includes(currentAssignTag)) {
-        currentAssignTag = Calc.tags[0];
-    }
-    container.innerHTML = Calc.tags.map(t => `
-        <button class="tag-chip ${currentAssignTag === t ? 'active' : ''}" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>
-    `).join('');
-    renderTagAssignList();
-}
 
-function renderTagAssignList() {
-    const container = document.getElementById('tagAssignList');
-    if (!container) return;
-    if (!currentAssignTag) {
-        container.innerHTML = '';
+    const toggle = e.target.closest('.tm-toggle');
+    if (toggle) {
+        const tag = toggle.dataset.tag;
+        openTag = openTag === tag ? '' : tag;
+        tagSearch = '';
+        renderTagManager();
         return;
     }
-    container.innerHTML = Calc.brands.map((b, i) => {
-        const checked = Calc.hasBrandTag(i, currentAssignTag);
-        return `
-        <button class="tag-assign-item ${checked ? 'checked' : ''}" data-index="${i}">
-            <span class="ta-check">${checked ? '☑' : '☐'}</span>
-            <span class="ta-name">${escapeHtml(b.name)}</span>
-        </button>`;
-    }).join('');
-}
 
-document.getElementById('tagSelect').addEventListener('click', function(e) {
-    const chip = e.target.closest('.tag-chip');
-    if (!chip) return;
-    currentAssignTag = chip.dataset.tag;
-    renderTagSelect();
-});
+    const brandItem = e.target.closest('.tag-assign-item');
+    if (brandItem && openTag) {
+        const idx = parseInt(brandItem.dataset.index);
+        Calc.toggleBrandTag(idx, openTag);
+        const checked = Calc.hasBrandTag(idx, openTag);
+        brandItem.classList.toggle('checked', checked);
+        brandItem.querySelector('.ta-check').textContent = checked ? '☑' : '☐';
 
-document.getElementById('tagAssignList').addEventListener('click', function(e) {
-    const item = e.target.closest('.tag-assign-item');
-    if (!item) return;
-    const idx = parseInt(item.dataset.index);
-    Calc.toggleBrandTag(idx, currentAssignTag);
-    renderTagAssignList();
-    renderTagManager();
-    renderBrandList();
-    renderTagFilter();
-});
+        const item = brandItem.closest('.tm-item');
+        const countEl = item && item.querySelector('.tm-count');
+        if (countEl) countEl.textContent = `${countTagBrands(openTag)} 个品牌`;
 
-// ==================== 设置页 ====================
-document.getElementById('themeToggle').addEventListener('click', function() {
-    const isDark = this.classList.toggle('on');
-    const theme = isDark ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', theme);
-    Storage.setTheme(theme);
-});
-
-// ==================== 保存按钮 → 弹出选择菜单 ====================
-const saveOverlay = document.getElementById('saveOverlay');
-
-document.getElementById('saveImageBtn').addEventListener('click', function() {
-    saveOverlay.classList.remove('hidden');
-});
-
-document.getElementById('cancelSave').addEventListener('click', function() {
-    saveOverlay.classList.add('hidden');
-});
-saveOverlay.addEventListener('click', function(e) {
-    if (e.target === saveOverlay) saveOverlay.classList.add('hidden');
-});
-
-function getPriceSummary() {
-    const lines = [];
-    Calc.brands.forEach((b, i) => {
-        if (Calc.hiddenPresets.has(i)) return;
-        const profit = Calc.calcProfit(i);
-        if (profit !== null) {
-            const sign = profit >= 0 ? '+' : '';
-            lines.push(`${b.name} ${sign}¥${profit.toFixed(2)}`);
-        }
-    });
-    const { totalProfit } = Calc.calcSummary();
-    if (lines.length === 0) return '暂无数据';
-    return lines.slice(0, 5).join('，') + (lines.length > 5 ? `... 等共${lines.length}个品牌` : '') + `，总利润 ¥${totalProfit.toFixed(2)}`;
-}
-
-document.getElementById('saveAsImage').addEventListener('click', function() {
-    saveOverlay.classList.add('hidden');
-
-    const iconEl = document.querySelector('#saveImageBtn .tab-icon');
-    const origIcon = iconEl.textContent;
-    iconEl.textContent = '⏳';
-
-    function doCapture() {
-        document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
-        const calcTab = document.querySelector('.tab-item[data-page="calc"]');
-        if (calcTab) calcTab.classList.add('active');
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        document.getElementById('page-calc').classList.add('active');
-
-        setTimeout(() => {
-            html2canvas(document.getElementById('page-calc'), {
-                backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
-                scale: 2,
-                useCORS: true,
-                allowTaint: true,
-                windowWidth: 500,
-            }).then(canvas => {
-                canvas.toBlob(function(blob) {
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = '差价计算_' + new Date().toISOString().slice(0, 10) + '.png';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    showToast('✅ ' + getPriceSummary() + '  |  图片已保存');
-                }, 'image/png');
-            }).catch(err => {
-                console.error('保存失败:', err);
-                showToast('❌ 保存失败，请重试');
-            }).finally(() => {
-                iconEl.textContent = origIcon;
-            });
-        }, 100);
-    }
-
-    if (typeof html2canvas === 'undefined') {
-        const script = document.createElement('script');
-        script.src = 'https://html2canvas.hertzen.com/dist/html2canvas.min.js';
-        script.onload = doCapture;
-        script.onerror = function() {
-            showToast('❌ 网络异常，请稍后重试');
-            iconEl.textContent = origIcon;
-        };
-        document.head.appendChild(script);
-    } else {
-        doCapture();
+        renderBrandList();
+        renderTagFilter();
     }
 });
-
-document.getElementById('shareLink').addEventListener('click', function() {
-    saveOverlay.classList.add('hidden');
-
-    const pageUrl = window.location.href.split('#')[0];
-    const shareText = `💰 差价计算器\n${getPriceSummary()}\n\n📱 ${pageUrl}`;
-
-    if (navigator.share) {
-        navigator.share({
-            title: '差价计算器',
-            text: shareText,
-            url: pageUrl,
-        }).catch(() => {});
-    } else {
-        const copyText = shareText;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(copyText).then(() => {
-                showToast('✅ 链接已复制，可粘贴发送给朋友');
-            }).catch(() => {
-                fallbackCopy(copyText);
-            });
-        } else {
-            fallbackCopy(copyText);
-        }
-    }
-});
-
-function fallbackCopy(text) {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed'; textarea.style.left = '-9999px';
-    document.body.appendChild(textarea);
-    textarea.select();
-    try { document.execCommand('copy'); showToast('✅ 链接已复制，可粘贴发送给朋友'); }
-    catch(e) { showToast('链接: ' + text); }
-    document.body.removeChild(textarea);
-}
 
 // ==================== 批量导入弹窗 ====================
 const importOverlay = document.getElementById('importOverlay');
@@ -652,27 +555,11 @@ function showToast(msg) {
     toast._timeout = setTimeout(() => toast.classList.remove('show'), 2000);
 }
 
-// ==================== 下载文件 ====================
-function downloadFile(filename, content, mimeType) {
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
-
 // ==================== 键盘快捷操作 ====================
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         if (!importOverlay.classList.contains('hidden')) {
             importOverlay.classList.add('hidden');
-        }
-        if (saveOverlay && !saveOverlay.classList.contains('hidden')) {
-            saveOverlay.classList.add('hidden');
         }
         if (!tagMenu.classList.contains('hidden')) {
             closeTagMenu();
