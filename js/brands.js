@@ -216,11 +216,10 @@ function textToBrands(text) {
             errors.push(`第${i + 1}行格式错误`);
             return;
         }
-        const wholesale = parseFloat(parts[parts.length - 1]);
+        let wholesale = parseFloat(parts[parts.length - 1]);
         let name, market;
 
         if (parts.length >= 3) {
-            // 品牌名 批发价 市场价
             const mp = parseFloat(parts[parts.length - 1]);
             const wp = parseFloat(parts[parts.length - 2]);
             if (!isNaN(wp) && !isNaN(mp)) {

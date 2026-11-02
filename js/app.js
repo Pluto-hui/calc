@@ -2,36 +2,47 @@
    app.js — 主入口 & UI 逻辑
    ============================================ */
 
+// 当前筛选的标签（空 = 显示全部）
+let currentFilterTag = '';
+
+// ---- HTML 转义（标签名由用户自定义，避免特殊字符破坏结构） ----
+function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[ch]));
+}
+
 // ---- 初始化 ----
 document.addEventListener('DOMContentLoaded', () => {
-    // 主题
-    const theme = Storage.getTheme();
-    document.documentElement.setAttribute('data-theme', theme);
-    if (theme === 'dark') document.getElementById('themeToggle').classList.add('on');
-
-    // 数据
     Calc.init();
+    renderTagFilter();
     renderBrandList();
     updateSummary();
 
-    // 品牌库编辑框
     document.getElementById('brandEditorText').value = brandsToText(Calc.brands);
 });
+
+// ---- Service Worker（PWA 离线缓存） ----
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => {
+            console.warn('Service Worker 注册失败:', err);
+        });
+    });
+}
 
 // ==================== 底部导航 ====================
 document.querySelectorAll('.tab-item').forEach(tab => {
     tab.addEventListener('click', function() {
         const page = this.dataset.page;
-        if (!page) return; // 保存按钮没有 page，跳过页面切换
-        // 切换 tab 高亮
+        if (!page) return;
         document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
         this.classList.add('active');
-        // 切换页面
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.getElementById('page-' + page).classList.add('active');
-        // 进入品牌库页时刷新内容
         if (page === 'brands') {
             document.getElementById('brandEditorText').value = brandsToText(Calc.brands);
+            renderTagManager();
         }
     });
 });
@@ -39,16 +50,21 @@ document.querySelectorAll('.tab-item').forEach(tab => {
 // ==================== 品牌列表渲染 ====================
 function renderBrandList() {
     const container = document.getElementById('brandList');
-    const visible = Calc.brands
+    renderTagFilter();
+    let visible = Calc.brands
         .map((b, i) => ({ ...b, idx: i }))
         .filter(b => !Calc.hiddenPresets.has(b.idx));
+
+    if (currentFilterTag) {
+        visible = visible.filter(b => Calc.hasBrandTag(b.idx, currentFilterTag));
+    }
 
     if (visible.length === 0) {
         container.innerHTML = `
             <div style="text-align:center;padding:40px 20px;color:var(--text-muted);">
                 <div style="font-size:40px;margin-bottom:10px;">📭</div>
-                <div style="font-size:14px;">品牌库为空</div>
-                <div style="font-size:12px;margin-top:4px;">切换到「品牌库」标签录入你的品牌</div>
+                <div style="font-size:14px;">${currentFilterTag ? '该标签下暂无品牌' : '品牌库为空'}</div>
+                <div style="font-size:12px;margin-top:4px;">${currentFilterTag ? '点击上方「🏷️ 标签」选择「全部」查看所有品牌' : '切换到「品牌库」标签录入你的品牌'}</div>
             </div>`;
         return;
     }
@@ -57,9 +73,14 @@ function renderBrandList() {
         const ws = Calc.getBrandWholesale(b.idx);
         const mkt = Calc.getBrandMarket(b.idx);
         const qty = Calc.getBrandQty(b.idx);
+        const tags = Calc.getBrandTags(b.idx);
+        const tagsHtml = tags.length
+            ? tags.map(t => `<button type="button" class="tag-pill${currentFilterTag === t ? ' active' : ''}" data-tag="${escapeHtml(t)}" title="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join('')
+            : '<span class="tag-empty">—</span>';
         return `
         <div class="brand-row preset" data-index="${b.idx}">
             <span class="brand-name">${b.name}</span>
+            <span class="brand-tags">${tagsHtml}</span>
             <input type="number" class="w-price" value="${ws}" step="0.1" min="0"
                    data-index="${b.idx}" data-field="wholesale" placeholder="批发价">
             <input type="number" class="m-price" value="${mkt}" step="0.1" min="0"
@@ -72,7 +93,99 @@ function renderBrandList() {
     }).join('');
 
     updateRestoreBtn();
+    recalcAllDiffs();
 }
+
+// ==================== 标签筛选下拉 ====================
+const tagFilterBtn = document.getElementById('tagFilterBtn');
+const tagMenu = document.getElementById('tagMenu');
+
+function closeTagMenu() {
+    tagMenu.classList.add('hidden');
+    tagFilterBtn.setAttribute('aria-expanded', 'false');
+}
+
+function openTagMenu() {
+    tagMenu.classList.remove('hidden');
+    tagFilterBtn.setAttribute('aria-expanded', 'true');
+
+    const margin = 8;
+    const btnRect = tagFilterBtn.getBoundingClientRect();
+    const menuWidth = Math.min(220, window.innerWidth - margin * 2);
+    let left = Math.min(btnRect.left, window.innerWidth - margin - menuWidth);
+    left = Math.max(margin, left);
+
+    tagMenu.style.width = menuWidth + 'px';
+    tagMenu.style.left = left + 'px';
+    tagMenu.style.top = (btnRect.bottom + 6) + 'px';
+    tagMenu.style.maxHeight = Math.max(140, Math.min(300, window.innerHeight - btnRect.bottom - 18)) + 'px';
+}
+
+function renderTagFilter() {
+    const label = document.getElementById('tagFilterLabel');
+    if (!label) return;
+    label.textContent = currentFilterTag || '全部';
+
+    const counts = {};
+    Object.keys(Calc.brandTags).forEach(k => {
+        (Calc.brandTags[k] || []).forEach(t => { counts[t] = (counts[t] || 0) + 1; });
+    });
+
+    let html = `<button class="tag-menu-item${currentFilterTag === '' ? ' active' : ''}" data-tag="">全部<span class="tmi-count">${Calc.brands.length} 个</span></button>`;
+    Calc.tags.forEach(t => {
+        html += `<button class="tag-menu-item${currentFilterTag === t ? ' active' : ''}" data-tag="${escapeHtml(t)}">${escapeHtml(t)}<span class="tmi-count">${counts[t] || 0} 个</span></button>`;
+    });
+    if (Calc.tags.length === 0) {
+        html += `<div class="tag-menu-empty">暂无标签，请到品牌库创建</div>`;
+    }
+    tagMenu.innerHTML = html;
+}
+
+tagFilterBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (tagMenu.classList.contains('hidden')) {
+        openTagMenu();
+    } else {
+        closeTagMenu();
+    }
+});
+
+tagMenu.addEventListener('click', function(e) {
+    const item = e.target.closest('.tag-menu-item');
+    if (!item) return;
+    currentFilterTag = item.dataset.tag;
+    closeTagMenu();
+    renderTagFilter();
+    renderBrandList();
+    recalcAllDiffs();
+});
+
+document.addEventListener('click', function(e) {
+    if (tagMenu.classList.contains('hidden')) return;
+    if (e.target.closest('.tag-filter-wrap')) return;
+    closeTagMenu();
+});
+
+window.addEventListener('scroll', function() {
+    if (!tagMenu.classList.contains('hidden')) closeTagMenu();
+}, { passive: true });
+
+window.addEventListener('resize', function() {
+    if (!tagMenu.classList.contains('hidden')) closeTagMenu();
+});
+
+// ==================== 行内标签 → 点击筛选 ====================
+document.getElementById('brandList').addEventListener('click', function(e) {
+    const pill = e.target.closest('.tag-pill');
+    if (!pill) return;
+    e.preventDefault();
+    const tag = pill.dataset.tag;
+    // 再次点击当前标签则取消筛选，回到「全部」
+    currentFilterTag = currentFilterTag === tag ? '' : tag;
+    renderTagFilter();
+    renderBrandList();
+    recalcAllDiffs();
+});
 
 // ==================== 事件委托：输入变化 ====================
 document.getElementById('brandList').addEventListener('input', function(e) {
@@ -164,13 +277,11 @@ document.getElementById('addCustomBtn').addEventListener('click', function() {
     if (!wholesale || wholesale <= 0) { showToast('请输入批发价'); return; }
     if (!market || market <= 0) { showToast('请输入市场价'); return; }
 
-    // 追加到品牌库
     const newBrand = { name, wholesale };
     if (market) newBrand.market = market;
     const newBrands = [...Calc.brands, newBrand];
     Calc.saveBrands(newBrands);
 
-    // 重渲染
     renderBrandList();
     recalcAllDiffs();
     updateSummary();
@@ -196,6 +307,7 @@ document.getElementById('saveBrandsBtn').addEventListener('click', function() {
     renderBrandList();
     recalcAllDiffs();
     updateSummary();
+    renderTagManager();
     showToast(`✅ 品牌库已保存（${brands.length} 个品牌）`);
 });
 
@@ -205,146 +317,152 @@ document.getElementById('resetBrandsBtn').addEventListener('click', function() {
         document.getElementById('brandEditorText').value = '';
         renderBrandList();
         updateSummary();
+        renderTagManager();
         showToast('品牌库已清空');
     }
 });
 
-// ==================== 设置页 ====================
-// 主题切换
-document.getElementById('themeToggle').addEventListener('click', function() {
-    const isDark = this.classList.toggle('on');
-    const theme = isDark ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', theme);
-    Storage.setTheme(theme);
-});
+// ==================== 标签管理（品牌库页） ====================
+let openTag = '';        // 当前展开的标签
+let tagSearch = '';      // 当前展开标签内的品牌搜索词
 
-// ==================== 保存按钮 → 弹出选择菜单 ====================
-const saveOverlay = document.getElementById('saveOverlay');
+function countTagBrands(tag) {
+    return Object.keys(Calc.brandTags).filter(k => Calc.brandTags[k].includes(tag)).length;
+}
 
-document.getElementById('saveImageBtn').addEventListener('click', function() {
-    saveOverlay.classList.remove('hidden');
-});
-
-document.getElementById('cancelSave').addEventListener('click', function() {
-    saveOverlay.classList.add('hidden');
-});
-saveOverlay.addEventListener('click', function(e) {
-    if (e.target === saveOverlay) saveOverlay.classList.add('hidden');
-});
-
-// ---- 生成价格摘要文字 ----
-function getPriceSummary() {
-    const lines = [];
-    Calc.brands.forEach((b, i) => {
-        if (Calc.hiddenPresets.has(i)) return;
-        const profit = Calc.calcProfit(i);
-        if (profit !== null) {
-            const sign = profit >= 0 ? '+' : '';
-            lines.push(`${b.name} ${sign}¥${profit.toFixed(2)}`);
-        }
+function applyTagSearch() {
+    const list = document.querySelector('.tm-item.open .tag-assign-list');
+    if (!list) return;
+    const q = tagSearch.trim().toLowerCase();
+    list.querySelectorAll('.tag-assign-item').forEach(item => {
+        const name = item.querySelector('.ta-name').textContent.toLowerCase();
+        item.classList.toggle('hidden', q !== '' && !name.includes(q));
     });
-    const { totalProfit } = Calc.calcSummary();
-    if (lines.length === 0) return '暂无数据';
-    return lines.slice(0, 5).join('，') + (lines.length > 5 ? `... 等共${lines.length}个品牌` : '') + `，总利润 ¥${totalProfit.toFixed(2)}`;
 }
 
-// ---- 保存为图片 ----
-document.getElementById('saveAsImage').addEventListener('click', function() {
-    saveOverlay.classList.add('hidden');
+function renderTagManager() {
+    const container = document.getElementById('tagList');
+    if (!container) return;
 
-    const iconEl = document.querySelector('#saveImageBtn .tab-icon');
-    const origIcon = iconEl.textContent;
-    iconEl.textContent = '⏳';
-
-    function doCapture() {
-        // 确保在计算器页面
-        document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
-        const calcTab = document.querySelector('.tab-item[data-page="calc"]');
-        if (calcTab) calcTab.classList.add('active');
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        document.getElementById('page-calc').classList.add('active');
-
-        setTimeout(() => {
-            html2canvas(document.getElementById('page-calc'), {
-                backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
-                scale: 2,
-                useCORS: true,
-                allowTaint: true,
-                windowWidth: 500,
-            }).then(canvas => {
-                canvas.toBlob(function(blob) {
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = '差价计算_' + new Date().toISOString().slice(0, 10) + '.png';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    showToast('✅ ' + getPriceSummary() + '  |  图片已保存');
-                }, 'image/png');
-            }).catch(err => {
-                console.error('保存失败:', err);
-                showToast('❌ 保存失败，请重试');
-            }).finally(() => {
-                iconEl.textContent = origIcon;
-            });
-        }, 100);
+    if (Calc.tags.length === 0) {
+        openTag = '';
+        tagSearch = '';
+        container.innerHTML = `<div class="tm-empty">暂无标签<br>在上方输入名称新建，新建后可直接勾选品牌</div>`;
+        return;
+    }
+    if (openTag && !Calc.tags.includes(openTag)) {
+        openTag = '';
+        tagSearch = '';
     }
 
-    if (typeof html2canvas === 'undefined') {
-        const script = document.createElement('script');
-        script.src = 'https://html2canvas.hertzen.com/dist/html2canvas.min.js';
-        script.onload = doCapture;
-        script.onerror = function() {
-            showToast('❌ 网络异常，请稍后重试');
-            iconEl.textContent = origIcon;
-        };
-        document.head.appendChild(script);
-    } else {
-        doCapture();
+    container.innerHTML = Calc.tags.map(t => {
+        const open = t === openTag;
+        const count = countTagBrands(t);
+        const brandsHtml = open ? `
+            <div class="tm-body">
+                <div class="tm-body-tip">勾选要加入「${escapeHtml(t)}」的品牌</div>
+                <input type="text" class="tm-search" placeholder="搜索品牌" value="${escapeHtml(tagSearch)}">
+                <div class="tag-assign-list">
+                    ${Calc.brands.map((b, i) => {
+                        const checked = Calc.hasBrandTag(i, t);
+                        return `<button type="button" class="tag-assign-item${checked ? ' checked' : ''}" data-index="${i}">
+                            <span class="ta-check">${checked ? '☑' : '☐'}</span>
+                            <span class="ta-name">${escapeHtml(b.name)}</span>
+                        </button>`;
+                    }).join('')}
+                </div>
+            </div>` : '';
+        return `
+        <div class="tm-item${open ? ' open' : ''}" data-tag="${escapeHtml(t)}">
+            <div class="tm-head">
+                <button type="button" class="tm-toggle" data-tag="${escapeHtml(t)}" aria-expanded="${open}">
+                    <span class="tm-name">🏷️ ${escapeHtml(t)}</span>
+                    <span class="tm-count">${count} 个品牌</span>
+                    <span class="tm-chevron">${open ? '▾' : '▸'}</span>
+                </button>
+                <button type="button" class="tm-del" data-tag="${escapeHtml(t)}" title="删除标签">删除</button>
+            </div>
+            ${brandsHtml}
+        </div>`;
+    }).join('');
+
+    if (tagSearch) applyTagSearch();
+}
+
+document.getElementById('addTagBtn').addEventListener('click', function() {
+    const input = document.getElementById('newTagName');
+    const name = input.value.trim();
+
+    if (!name) { showToast('请输入标签名'); input.focus(); return; }
+    if (name.length > 12) { showToast('标签名最多 12 个字'); return; }
+    if (Calc.tags.includes(name)) { showToast(`⚠️ 标签「${name}」已存在`); input.focus(); return; }
+    if (!Calc.addTag(name)) { showToast('标签创建失败，请重试'); return; }
+
+    input.value = '';
+    openTag = name;
+    tagSearch = '';
+    renderTagManager();
+    renderTagFilter();
+    showToast(`✅ 标签「${name}」已创建，请勾选品牌`);
+
+    const created = [...document.querySelectorAll('.tm-item')].find(el => el.dataset.tag === name);
+    if (created) created.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
+
+document.getElementById('newTagName').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('addTagBtn').click();
     }
 });
 
-// ---- 分享链接 ----
-document.getElementById('shareLink').addEventListener('click', function() {
-    saveOverlay.classList.add('hidden');
+document.getElementById('tagList').addEventListener('input', function(e) {
+    if (!e.target.classList.contains('tm-search')) return;
+    tagSearch = e.target.value;
+    applyTagSearch();
+});
 
-    const pageUrl = 'https://pluto-hui.github.io/calc';
-    const shareText = `💰 差价计算器\n${getPriceSummary()}\n\n📱 ${pageUrl}`;
-
-    if (navigator.share) {
-        navigator.share({
-            title: '差价计算器',
-            text: shareText,
-            url: pageUrl,
-        }).catch(() => {});
-    } else {
-        // PC 端复制链接
-        const copyText = shareText;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(copyText).then(() => {
-                showToast('✅ 链接已复制，可粘贴发送给朋友');
-            }).catch(() => {
-                fallbackCopy(copyText);
-            });
-        } else {
-            fallbackCopy(copyText);
+document.getElementById('tagList').addEventListener('click', function(e) {
+    const del = e.target.closest('.tm-del');
+    if (del) {
+        const tag = del.dataset.tag;
+        if (confirm(`确定删除标签「${tag}」吗？该标签将从所有品牌移除。`)) {
+            Calc.deleteTag(tag);
+            if (currentFilterTag === tag) currentFilterTag = '';
+            if (openTag === tag) { openTag = ''; tagSearch = ''; }
+            renderTagManager();
+            renderTagFilter();
+            renderBrandList();
+            showToast(`✅ 已删除标签「${tag}」`);
         }
+        return;
+    }
+
+    const toggle = e.target.closest('.tm-toggle');
+    if (toggle) {
+        const tag = toggle.dataset.tag;
+        openTag = openTag === tag ? '' : tag;
+        tagSearch = '';
+        renderTagManager();
+        return;
+    }
+
+    const brandItem = e.target.closest('.tag-assign-item');
+    if (brandItem && openTag) {
+        const idx = parseInt(brandItem.dataset.index);
+        Calc.toggleBrandTag(idx, openTag);
+        const checked = Calc.hasBrandTag(idx, openTag);
+        brandItem.classList.toggle('checked', checked);
+        brandItem.querySelector('.ta-check').textContent = checked ? '☑' : '☐';
+
+        const item = brandItem.closest('.tm-item');
+        const countEl = item && item.querySelector('.tm-count');
+        if (countEl) countEl.textContent = `${countTagBrands(openTag)} 个品牌`;
+
+        renderBrandList();
+        renderTagFilter();
     }
 });
-
-// 降级复制
-function fallbackCopy(text) {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed'; textarea.style.left = '-9999px';
-    document.body.appendChild(textarea);
-    textarea.select();
-    try { document.execCommand('copy'); showToast('✅ 链接已复制，可粘贴发送给朋友'); }
-    catch(e) { showToast('链接: ' + text); }
-    document.body.removeChild(textarea);
-}
 
 // ==================== 批量导入弹窗 ====================
 const importOverlay = document.getElementById('importOverlay');
@@ -437,31 +555,14 @@ function showToast(msg) {
     toast._timeout = setTimeout(() => toast.classList.remove('show'), 2000);
 }
 
-// ==================== 下载文件 ====================
-function downloadFile(filename, content, mimeType) {
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
-
 // ==================== 键盘快捷操作 ====================
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         if (!importOverlay.classList.contains('hidden')) {
             importOverlay.classList.add('hidden');
         }
-        // 关闭二维码放大弹窗
-        const qrOverlay = document.getElementById('qrOverlay');
-        if (qrOverlay && !qrOverlay.classList.contains('hidden')) {
-            qrOverlay.classList.add('hidden');
+        if (!tagMenu.classList.contains('hidden')) {
+            closeTagMenu();
         }
     }
 });
-
-

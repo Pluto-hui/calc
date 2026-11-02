@@ -3,7 +3,6 @@
    ============================================ */
 
 const STORAGE_KEY = 'cigarette_calc_data_v3';
-const THEME_KEY = 'cigarette_calc_theme';
 
 // ---- 默认品牌库（首次使用时自动加载） ----
 const DEFAULT_BRANDS = [
@@ -70,8 +69,6 @@ const DEFAULT_BRANDS = [
 const HAS_LOADED_DEFAULTS = 'cigarette_calc_defaults_loaded';
 
 const Storage = {
-
-    // ---- 品牌库 ----
     loadBrands() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
@@ -83,7 +80,6 @@ const Storage = {
             }
         } catch (e) { /* ignore */ }
 
-        // 首次使用：自动加载默认品牌库
         if (!localStorage.getItem(HAS_LOADED_DEFAULTS)) {
             localStorage.setItem(HAS_LOADED_DEFAULTS, '1');
             Storage.saveBrands(DEFAULT_BRANDS);
@@ -95,7 +91,17 @@ const Storage = {
 
     saveBrands(brands) {
         try {
-            const data = { brands, updatedAt: new Date().toISOString() };
+            let data = {};
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+                try {
+                    data = JSON.parse(raw) || {};
+                } catch (e) {
+                    data = {};
+                }
+            }
+            data.brands = brands;
+            data.updatedAt = new Date().toISOString();
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
             return true;
         } catch (e) {
@@ -104,7 +110,60 @@ const Storage = {
         }
     },
 
-    // ---- 使用记录 ----
+    loadTags() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+                const data = JSON.parse(raw);
+                if (data.tags && Array.isArray(data.tags)) {
+                    return data.tags;
+                }
+            }
+        } catch (e) { /* ignore */ }
+        return [];
+    },
+
+    loadBrandTags() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+                const data = JSON.parse(raw);
+                if (data.brandTags && typeof data.brandTags === 'object') {
+                    return data.brandTags;
+                }
+            }
+        } catch (e) { /* ignore */ }
+        return {};
+    },
+
+    saveTags(tags) {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            const data = raw ? JSON.parse(raw) : {};
+            data.tags = tags;
+            data.updatedAt = new Date().toISOString();
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            return true;
+        } catch (e) {
+            console.error('保存标签失败:', e);
+            return false;
+        }
+    },
+
+    saveBrandTags(brandTags) {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            const data = raw ? JSON.parse(raw) : {};
+            data.brandTags = brandTags;
+            data.updatedAt = new Date().toISOString();
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            return true;
+        } catch (e) {
+            console.error('保存品牌标签映射失败:', e);
+            return false;
+        }
+    },
+
     loadRecords() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
@@ -122,7 +181,7 @@ const Storage = {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
             const data = raw ? JSON.parse(raw) : {};
-            data.records = records.slice(0, 100); // 最多保留100条
+            data.records = records.slice(0, 100);
             data.updatedAt = new Date().toISOString();
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
             return true;
@@ -132,7 +191,6 @@ const Storage = {
         }
     },
 
-    // ---- 导出全部数据 ----
     exportAll() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
@@ -156,14 +214,5 @@ const Storage = {
             console.error('导入失败:', e);
         }
         return false;
-    },
-
-    // ---- 主题 ----
-    getTheme() {
-        return localStorage.getItem(THEME_KEY) || 'light';
-    },
-
-    setTheme(theme) {
-        localStorage.setItem(THEME_KEY, theme);
     },
 };

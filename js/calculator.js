@@ -3,23 +3,63 @@
    ============================================ */
 
 const Calc = {
-
-    // ---- 数据 ----
     brands: [],              // 当前品牌库 [{name, wholesale, market?}]
     hiddenPresets: new Set(),
+    tags: [],                // 标签名列表 ['高价位卷烟', '中华烟', ...]
+    brandTags: {},           // 品牌索引 → 标签名数组 { 0: ['中华烟','高价位卷烟'] }
     marketOverride: {},      // {index: value} 临时覆盖市场价
     wholesaleOverride: {},   // {index: value} 临时覆盖批发价
     qtyCache: {},            // {index: value}
     usageRecords: [],        // 使用记录
 
-    // ---- 初始化 ----
     init() {
         this.brands = Storage.loadBrands();
+        this.tags = Storage.loadTags();
+        this.brandTags = Storage.loadBrandTags();
         this.usageRecords = Storage.loadRecords();
         buildBrandIndex(this.brands);
     },
 
-    // ---- 获取品牌显示数据 ----
+    addTag(name) {
+        const n = (name || '').trim();
+        if (!n || this.tags.includes(n)) return false;
+        this.tags.push(n);
+        Storage.saveTags(this.tags);
+        return true;
+    },
+
+    deleteTag(name) {
+        this.tags = this.tags.filter(t => t !== name);
+        Storage.saveTags(this.tags);
+        Object.keys(this.brandTags).forEach(k => {
+            this.brandTags[k] = this.brandTags[k].filter(t => t !== name);
+            if (this.brandTags[k].length === 0) delete this.brandTags[k];
+        });
+        Storage.saveBrandTags(this.brandTags);
+    },
+
+    toggleBrandTag(brandIdx, tagName) {
+        const key = String(brandIdx);
+        if (!this.brandTags[key]) this.brandTags[key] = [];
+        const arr = this.brandTags[key];
+        const pos = arr.indexOf(tagName);
+        if (pos >= 0) {
+            arr.splice(pos, 1);
+            if (arr.length === 0) delete this.brandTags[key];
+        } else {
+            arr.push(tagName);
+        }
+        Storage.saveBrandTags(this.brandTags);
+    },
+
+    getBrandTags(brandIdx) {
+        return this.brandTags[String(brandIdx)] || [];
+    },
+
+    hasBrandTag(brandIdx, tagName) {
+        return this.getBrandTags(brandIdx).includes(tagName);
+    },
+
     getBrandWholesale(idx) {
         return this.wholesaleOverride[idx] !== undefined
             ? this.wholesaleOverride[idx]
@@ -36,7 +76,6 @@ const Calc = {
         return this.qtyCache[idx] || 1;
     },
 
-    // ---- 计算单行利润 ----
     calcProfit(idx) {
         const w = parseFloat(this.getBrandWholesale(idx)) || 0;
         const m = parseFloat(this.getBrandMarket(idx)) || 0;
@@ -47,7 +86,6 @@ const Calc = {
         return null;
     },
 
-    // ---- 计算汇总 ----
     calcSummary() {
         let totalCost = 0, totalMarket = 0, totalProfit = 0;
 
@@ -66,14 +104,27 @@ const Calc = {
         return { totalCost, totalMarket, totalProfit };
     },
 
-    // ---- 保存品牌库 ----
     saveBrands(newBrands) {
+        // 先按品牌名快照标签，避免品牌列表增删/排序后索引错位
+        const tagsByName = {};
+        this.brands.forEach((b, i) => {
+            const tags = this.brandTags[String(i)];
+            if (tags && tags.length) tagsByName[b.name] = tags.slice();
+        });
+
         this.brands = newBrands;
         Storage.saveBrands(newBrands);
         buildBrandIndex(newBrands);
-        // 清理与新品牌库不匹配的缓存
         const valid = new Set(newBrands.map((_, i) => i));
         this.hiddenPresets = new Set([...this.hiddenPresets].filter(i => valid.has(i)));
+
+        const rebuiltBrandTags = {};
+        newBrands.forEach((b, i) => {
+            const tags = tagsByName[b.name];
+            if (tags && tags.length) rebuiltBrandTags[i] = tags.slice();
+        });
+        this.brandTags = rebuiltBrandTags;
+        Storage.saveBrandTags(this.brandTags);
         [this.marketOverride, this.wholesaleOverride, this.qtyCache].forEach(cache => {
             Object.keys(cache).forEach(k => {
                 if (!valid.has(parseInt(k))) delete cache[k];
@@ -81,7 +132,6 @@ const Calc = {
         });
     },
 
-    // ---- 导出 CSV ----
     exportCSV() {
         const rows = [['品牌', '批发价(条)', '市场价(条)', '数量(条)', '单条差价', '小计差价']];
         this.brands.forEach((b, i) => {
@@ -106,7 +156,6 @@ const Calc = {
         return rows.map(r => r.join(',')).join('\n');
     },
 
-    // ---- 导出备份 JSON ----
     exportJSON() {
         return JSON.stringify({
             version: 3,
@@ -116,7 +165,6 @@ const Calc = {
         }, null, 2);
     },
 
-    // ---- 导入备份 JSON ----
     importJSON(jsonStr) {
         try {
             const data = JSON.parse(jsonStr);
@@ -131,7 +179,6 @@ const Calc = {
         return false;
     },
 
-    // ---- 添加使用记录 ----
     addRecord(result) {
         this.usageRecords.unshift({
             ...result,
