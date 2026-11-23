@@ -15,6 +15,7 @@ function escapeHtml(str) {
 // ---- 初始化 ----
 document.addEventListener('DOMContentLoaded', () => {
     Calc.init();
+    restoreSnapshot();
     renderTagFilter();
     renderBrandList();
     updateSummary();
@@ -30,6 +31,150 @@ if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
         });
     });
 }
+
+// ==================== 当前计算：保存 / 分享 / 清空 / 打印 ====================
+function restoreSnapshot() {
+    const snap = Storage.loadSnapshot();
+    if (!snap || !Array.isArray(snap.items)) return;
+
+    const indexByName = new Map(Calc.brands.map((b, i) => [b.name, i]));
+    snap.items.forEach(item => {
+        const i = indexByName.get(item.name);
+        if (i === undefined) return;
+        if (item.wholesale !== '' && item.wholesale !== null && item.wholesale !== undefined) {
+            Calc.wholesaleOverride[i] = item.wholesale;
+        }
+        if (item.market !== '' && item.market !== null && item.market !== undefined) {
+            Calc.marketOverride[i] = item.market;
+        }
+        const qty = parseInt(item.qty, 10);
+        if (qty > 0) Calc.qtyCache[i] = qty;
+        if (item.hidden) Calc.hiddenPresets.add(i);
+    });
+}
+
+function buildSnapshot() {
+    return {
+        savedAt: new Date().toISOString(),
+        items: Calc.brands.map((b, i) => ({
+            name: b.name,
+            wholesale: Calc.wholesaleOverride[i] !== undefined ? Calc.wholesaleOverride[i] : '',
+            market: Calc.marketOverride[i] !== undefined ? Calc.marketOverride[i] : '',
+            qty: Calc.qtyCache[i] !== undefined ? Calc.qtyCache[i] : '',
+            hidden: Calc.hiddenPresets.has(i),
+        })),
+    };
+}
+
+function getSummaryText() {
+    const { totalCost, totalMarket, totalProfit } = Calc.calcSummary();
+    let count = 0;
+    Calc.brands.forEach((b, i) => {
+        if (!Calc.hiddenPresets.has(i) && Calc.calcProfit(i) !== null) count++;
+    });
+    return [
+        '💰 卷烟差价计算',
+        `总成本：¥${totalCost.toFixed(2)}`,
+        `市场价合计：¥${totalMarket.toFixed(2)}`,
+        `利润差价：¥${totalProfit.toFixed(2)}`,
+        `已填写价格：${count} 个品牌`,
+        window.location.href.split('#')[0],
+    ].join('\n');
+}
+
+function saveCurrentCalc() {
+    const ok = Storage.saveSnapshot(buildSnapshot());
+    if (!ok) { showToast('❌ 保存失败，请检查浏览器存储'); return; }
+    showToast('✅ 当前计算已保存，刷新后自动恢复');
+    const btn = document.getElementById('saveCalcBtn');
+    if (btn) {
+        btn.classList.add('saved');
+        setTimeout(() => btn.classList.remove('saved'), 900);
+    }
+}
+
+async function shareCurrentCalc() {
+    const text = getSummaryText();
+    if (navigator.share) {
+        try {
+            await navigator.share({ title: '卷烟差价计算器', text });
+            return;
+        } catch (e) {
+            if (e && e.name === 'AbortError') return;
+        }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+            await navigator.clipboard.writeText(text);
+            showToast('✅ 分享内容已复制');
+            return;
+        } catch (e) { /* fall through */ }
+    }
+    fallbackCopy(text);
+}
+
+function fallbackCopy(text) {
+    try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast(ok ? '✅ 分享内容已复制' : '分享内容生成失败');
+    } catch (e) {
+        showToast('分享内容生成失败');
+    }
+}
+
+function clearCurrentCalc() {
+    if (!confirm('确定清空当前计算吗？品牌库和标签会保留。')) return;
+    Calc.marketOverride = {};
+    Calc.wholesaleOverride = {};
+    Calc.qtyCache = {};
+    Calc.hiddenPresets.clear();
+    Storage.clearSnapshot();
+    currentFilterTag = '';
+    document.getElementById('newBrandName').value = '';
+    document.getElementById('newWholesale').value = '';
+    document.getElementById('newMarket').value = '';
+    closeTagMenu();
+    renderTagFilter();
+    renderBrandList();
+    updateSummary();
+    showToast('✅ 已清空当前计算（品牌库保留）');
+}
+
+function printCurrentCalc() {
+    const dateEl = document.getElementById('printDate');
+    if (dateEl) {
+        dateEl.textContent = '打印时间：' + new Date().toLocaleString('zh-CN');
+    }
+    const rows = [...document.querySelectorAll('.brand-row')];
+    rows.forEach(row => {
+        const m = parseFloat(row.querySelector('.m-price')?.value);
+        const q = parseInt(row.querySelector('.qty')?.value, 10);
+        row.classList.toggle('print-hide', !(m > 0 && q > 0));
+    });
+    document.body.classList.add('printing-home');
+    const cleanup = () => {
+        document.body.classList.remove('printing-home');
+        rows.forEach(row => row.classList.remove('print-hide'));
+        window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    setTimeout(() => {
+        window.print();
+        setTimeout(cleanup, 800);
+    }, 30);
+}
+
+document.getElementById('saveCalcBtn').addEventListener('click', saveCurrentCalc);
+document.getElementById('shareCalcBtn').addEventListener('click', shareCurrentCalc);
+document.getElementById('clearCalcBtn').addEventListener('click', clearCurrentCalc);
+document.getElementById('printCalcBtn').addEventListener('click', printCurrentCalc);
 
 // ==================== 底部导航 ====================
 document.querySelectorAll('.tab-item').forEach(tab => {

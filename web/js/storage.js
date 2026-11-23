@@ -3,6 +3,7 @@
    ============================================ */
 
 const STORAGE_KEY = 'cigarette_calc_data_v3';
+const SNAPSHOT_KEY = 'cigarette_calc_snapshot_v1';
 
 // ---- 默认品牌库（首次使用时自动加载） ----
 const DEFAULT_BRANDS = [
@@ -214,5 +215,30 @@ const Storage = {
             console.error('导入失败:', e);
         }
         return false;
+    },
+
+    loadSnapshot() {
+        try {
+            const raw = localStorage.getItem(SNAPSHOT_KEY);
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+            return null;
+        }
+    },
+
+    saveSnapshot(snapshot) {
+        try {
+            localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));
+            return true;
+        } catch (e) {
+            console.error('保存计算状态失败:', e);
+            return false;
+        }
+    },
+
+    clearSnapshot() {
+        try {
+            localStorage.removeItem(SNAPSHOT_KEY);
+        } catch (e) { /* ignore */ }
     },
 };

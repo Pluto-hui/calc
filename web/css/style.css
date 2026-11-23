@@ -53,6 +53,29 @@ body {
 }
 .header h1 { font-size: 20px; font-weight: 700; color: var(--text); }
 .header .tip { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+.header-title { min-width: 0; flex: 1; }
+.header-actions {
+    display: flex; align-items: center; gap: 5px;
+    flex-shrink: 0; padding-bottom: 2px;
+}
+.header-action {
+    width: 33px; height: 33px; border-radius: 50%;
+    border: 1px solid var(--border); background: var(--bg-card);
+    color: var(--text); font-size: 15px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: transform 0.12s, background 0.15s, border-color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+}
+.header-action:active {
+    transform: scale(0.92);
+    background: var(--accent-light);
+    border-color: var(--accent);
+}
+.header-action.saved {
+    border-color: var(--positive);
+    background: #effaf3;
+}
+.header-action:disabled { opacity: 0.45; cursor: default; }
 
 /* ---- 工具栏 ---- */
 .toolbar {
@@ -424,3 +447,99 @@ body {
     height: 46px; animation: pulse 1.5s ease-in-out infinite;
 }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+/* ---- 打印 ---- */
+.print-head { display: none; }
+
+@media (max-width: 380px) {
+    .header h1 { font-size: 18px; }
+    .header-actions { gap: 4px; }
+    .header-action { width: 29px; height: 29px; font-size: 13px; }
+}
+
+@media print {
+    @page { size: A4; margin: 12mm; }
+    html, body { background: #fff !important; color: #000 !important; }
+    body { display: block !important; }
+    .container {
+        max-width: none !important; width: auto !important;
+        padding: 0 !important; margin: 0 !important;
+    }
+    .tab-bar, .toolbar, .header, .header-actions, .add-row,
+    .toast, .overlay, .tag-menu, .del-btn {
+        display: none !important;
+    }
+    .page { display: none !important; }
+    body.printing-home #page-calc { display: block !important; }
+    .print-head {
+        display: block !important; text-align: center; margin-bottom: 6mm;
+    }
+    .print-head h2 { font-size: 18pt; margin-bottom: 2mm; }
+    .print-head div { font-size: 9pt; color: #555; }
+    .brand-row {
+        background: #fff !important;
+        border-bottom: 1px solid #d9d9d9;
+        padding: 5px 3px !important;
+        break-inside: avoid;
+    }
+    .brand-row:first-of-type { border-radius: 0 !important; }
+    .brand-row.print-hide { display: none !important; }
+    .brand-name { color: #000 !important; }
+    .brand-row input {
+        border: none !important;
+        background: transparent !important;
+        color: #000 !important;
+        font-size: 9pt !important;
+        padding: 0 2px !important;
+    }
+    .brand-row input::placeholder { color: transparent !important; }
+    .brand-tags { width: 42px !important; min-width: 42px !important; }
+    .tag-pill {
+        background: transparent !important;
+        color: #333 !important;
+        border: 1px solid #bbb !important;
+        font-size: 7pt !important;
+        padding: 0 2px !important;
+    }
+    .tag-empty { color: #777 !important; }
+    .list-header {
+        position: static !important;
+        background: #fff !important;
+        color: #000 !important;
+        border-bottom: 1px solid #000;
+    }
+    .diff-display { color: #000 !important; }
+    .diff-display.positive, .diff-display.negative { color: #000 !important; }
+    .summary-card {
+        position: static !important;
+        transform: none !important;
+        left: auto !important;
+        bottom: auto !important;
+        width: auto !important;
+        max-width: none !important;
+        margin: 6mm 0 0 !important;
+        padding: 4mm !important;
+        background: #f2f2f2 !important;
+        color: #000 !important;
+        box-shadow: none !important;
+        border: 1px solid #ccc;
+        border-radius: 0 !important;
+    }
+    .summary-card .s-value,
+    .summary-card .s-value.big {
+        color: #000 !important;
+        text-shadow: none !important;
+        font-size: 14pt !important;
+    }
+    .summary-card .s-label { color: #555 !important; opacity: 1 !important; }
+    .summary-card .sum-divider-v { background: #bbb !important; }
+}
+
+/* ---- 小屏汇总卡片 ---- */
+@media (max-width: 380px) {
+    .summary-card { padding: 12px 14px; }
+    .summary-card .s-value { font-size: 16px; }
+    .summary-card .s-value.big { font-size: 20px; }
+    .summary-card .s-label { font-size: 9px; letter-spacing: 0; }
+    .summary-card .sum-divider-v { height: 30px; }
+}
