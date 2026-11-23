@@ -30,10 +30,10 @@
                 <div class="tip">点击数字直接修改 · 差价自动计算</div>
             </div>
             <div class="header-actions" id="calcActions">
-                <button class="header-action" id="saveCalcBtn" type="button" title="保存当前计算" aria-label="保存当前计算">💾</button>
-                <button class="header-action" id="shareCalcBtn" type="button" title="分享当前计算" aria-label="分享当前计算">📤</button>
-                <button class="header-action" id="clearCalcBtn" type="button" title="清空当前计算" aria-label="清空当前计算">🗑️</button>
-                <button class="header-action" id="printCalcBtn" type="button" title="打印当前计算" aria-label="打印当前计算">🖨️</button>
+                <button class="header-action" id="saveCalcBtn" type="button" title="保存当前计算" aria-label="保存当前计算"><span class="ha-icon">💾</span><span class="ha-text">保存</span></button>
+                <button class="header-action" id="shareCalcBtn" type="button" title="分享当前计算" aria-label="分享当前计算"><span class="ha-icon">📤</span><span class="ha-text">分享</span></button>
+                <button class="header-action" id="clearCalcBtn" type="button" title="清空当前计算" aria-label="清空当前计算"><span class="ha-icon">🗑️</span><span class="ha-text">清空</span></button>
+                <button class="header-action" id="printCalcBtn" type="button" title="打印当前计算" aria-label="打印当前计算"><span class="ha-icon">🖨️</span><span class="ha-text">打印</span></button>
             </div>
         </div>
 
@@ -93,10 +93,10 @@
 
         <div class="brand-editor tag-manager">
             <h3 class="tm-title">🏷️ 标签管理</h3>
-            <div class="tm-hint">新建标签后会自动展开，直接勾选品牌即可分配</div>
+            <div class="tm-hint">输入标签名后点「确定」，新建后自动展开，直接勾选品牌即可分配</div>
             <div class="tm-add">
                 <input type="text" id="newTagName" placeholder="输入标签名，如：高价位卷烟" maxlength="12">
-                <button class="btn-save" id="addTagBtn">＋ 新建</button>
+                <button class="btn-save" id="addTagBtn" title="确定新建标签">✓ 确定</button>
             </div>
             <div class="tm-list" id="tagList"></div>
         </div>
